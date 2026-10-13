@@ -103,54 +103,51 @@ body,
   overflow: hidden;
 }
 
-/* เลือกอวตารจากตารางภาพโดยตรง · ปุ่มสูงพอสำหรับแตะบนจอเล็ก */
+/* เลือกอวตาร: โชว์ตัวที่เลือกอยู่ตัวเดียว + ลูกศรซ้าย/ขวา · ขนาดโปรไฟล์เท่าเดิมก่อนเพิ่มตารางอวตาร */
 .avatar-picker {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   margin: 2px 0 6px;
 }
 
 .avatar-picker__stage {
   display: grid;
   place-items: center;
-  width: 88px;
-  height: 88px;
+  width: 148px;
+  height: 148px;
   border: var(--border-thick);
   border-radius: 50%;
   background: var(--white);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-sm);
 }
 
-.avatar-picker__grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 5px;
-  width: min(100%, 330px);
+.avatar-picker__arrow {
+  width: 48px;
+  height: 56px;
 }
 
-.avatar-picker__choice {
-  display: grid;
-  place-items: center;
-  min-width: 0;
-  min-height: 44px;
-  padding: 3px;
-  border: var(--border);
-  border-radius: var(--r-sm);
-  background: var(--cream);
-  box-shadow: var(--shadow-xs);
-  cursor: pointer;
-}
-
-.avatar-picker__choice--selected {
-  background: var(--yellow);
-  outline: 3px solid var(--blue);
-  outline-offset: 1px;
-}
-
+/* กล่องแคบ (SET UP / กล่องเข้าห้อง): ภาพเล็กลง โครงเดิม · ปุ่มยังสูง ≥ 44px ตามกฎ */
 .avatar-picker--compact {
   width: 100%;
   margin: 6px 0;
+}
+
+.avatar-picker--compact .avatar-picker__stage {
+  width: 96px;
+  height: 96px;
+  box-shadow: var(--shadow-xs);
+}
+
+.avatar-picker--compact .avatar-picker__stage .pix {
+  width: 72px;
+  height: 72px;
+}
+
+.avatar-picker--compact .avatar-picker__arrow {
+  width: 44px;
+  height: 52px;
 }
 
 .join-avatar__label {
@@ -164,11 +161,6 @@ body,
   margin-top: 4px;
 }
 
-.setup__opts > .avatar-picker--compact {
-  max-height: 108px;
-  overflow-y: auto;
-  padding: 3px 5px;
-}
 
 /* ---- ปุ่ม / ช่องกรอก (Elevation 1) ---- */
 .btn,
