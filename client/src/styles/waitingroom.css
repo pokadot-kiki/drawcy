@@ -1,0 +1,1169 @@
+/* ==========================================================================
+   หน้าห้องรอ แบบสองฝั่ง (จอคอม)
+     ซ้าย  = ตั้งค่าเกม (การ์ดเลข 1–5) + Mini Challenge
+     ขวา   = ผู้เล่น + ปุ่มเริ่ม/พร้อม (+ กติกาทีม ถ้าเป็นโหมดทีม)
+   จอแคบกว่า 1001px = เรียงเป็นคอลัมน์เดียว (หัวห้อง: ตั้งค่า → Challenge → ผู้เล่น · คนอื่น: ผู้เล่น → ตั้งค่า → Challenge)
+   ไฟล์นี้ import "หลัง" theme.css และ arcade.css เพื่อชนะ selector ระดับเดียวกัน
+   ทุกคลาสขึ้นต้นด้วย wr- (หรืออยู่ใต้ .screen--waiting / .wr) จึงไม่ชนกับหน้าอื่น (บทเรียน CSS ชนกันของโปรเจกต์นี้)
+   ========================================================================== */
+
+/* ---- โครงจอ: ชิดบน ไม่จัดกลางแนวตั้ง (หน้านี้สูงกว่าจอได้ ให้เลื่อนลง) ---- */
+.screen--waiting {
+  justify-content: flex-start;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px 28px;
+}
+
+/* ---- แถบบน ---- */
+.wr-topbar {
+  width: 100%;
+  max-width: 1180px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.wr-topbar__left,
+.wr-topbar__right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* โลโก้ย่อ: สองคำเรียงบรรทัดเดียว ขอบตัวอักษรบางลง */
+.wr-topbar .logo {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  font-size: clamp(14px, 2.4vw, 22px);
+}
+
+.wr-topbar .logo span {
+  text-shadow:
+    2px 2px 0 var(--ink),
+    -2px 2px 0 var(--ink),
+    2px -2px 0 var(--ink),
+    -2px -2px 0 var(--ink);
+}
+
+.wr-roomchip,
+.wr-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 14px;
+  border: 2px solid var(--ink);
+  border-radius: var(--r-pill, 999px);
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.wr-chip {
+  background: var(--tab-idle);
+}
+
+/* ชิปโปรไฟล์ของเรา: อวตาร + ชื่อ (ตัดด้วย ... ถ้ายาว) */
+.wr-me {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 240px;
+  min-height: 44px;
+  padding: 2px 16px 2px 3px;
+  border: var(--border);
+  border-radius: var(--r-pill, 999px);
+  background: var(--white);
+  box-shadow: var(--shadow-xs);
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.wr-me .avatar-chip {
+  width: 36px;
+  height: 36px;
+}
+
+.wr-me__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wr-exit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+}
+
+/* ---- เปลือกใหญ่ของเนื้อหา ---- */
+.wr {
+  width: 100%;
+  max-width: 1180px;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: var(--cream);
+  border: var(--border-thick);
+  border-radius: var(--r-card, 20px);
+  box-shadow: var(--shadow);
+}
+
+/* ---- แถบรหัสห้อง ---- */
+.wr-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+}
+
+.wr-bar .btn--invite {
+  margin-top: 0; /* .btn--invite เดิมมี margin-top 10px สำหรับที่อื่น */
+}
+
+.wr-bar__vis {
+  margin-left: 0;
+}
+
+.wr-bar__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.wr-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 16px;
+  border: var(--border);
+  border-radius: var(--r-pill, 999px);
+  background: var(--yellow);
+  box-shadow: var(--shadow-xs);
+  color: var(--ink);
+  font-family: var(--font-head);
+  cursor: pointer;
+}
+
+.wr-code:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 var(--ink);
+}
+
+.wr-code__label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.wr-code__digits {
+  min-width: 5.4ch; /* ข้อความ "คัดลอกแล้ว!" โผล่แล้วปุ่มไม่ขยับตำแหน่งของข้างเคียง */
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- สองฝั่ง ---- */
+.wr__cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.wr__left,
+.wr__right {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* ---- การ์ดย่อย ---- */
+.wr-card {
+  padding: 14px;
+  border: 3px solid var(--ink);
+  border-radius: var(--r-ctl, 14px);
+  background: var(--white);
+}
+
+.wr-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap; /* จอแคบ: ข้อความอธิบายตกลงบรรทัดใหม่ ไม่บีบหัวข้อ */
+  gap: 4px 10px;
+  margin-bottom: 12px;
+}
+
+.wr-card__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.02em;
+}
+
+.wr-card__head .wr-card__title {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.wr-card__note {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: right;
+}
+
+/* คำอธิบาย "หัวห้องเป็นคนเปิด/ปิดกติกา" ของ ChallengeCards ซ้ำกับข้อความบนกล่อง "ตั้งค่าเกม" แล้ว ซ่อนไว้ในหน้านี้ */
+.wr .challenge-cards-wrap .hint-text {
+  display: none;
+}
+
+/* ---- การ์ดตัวเลือกเลข 1–5 ---- */
+.wr-opts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.wr-opt {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 2px solid var(--ink);
+  border-radius: var(--r-sm, 10px);
+  background: var(--tab-idle);
+}
+
+.wr-opt--wide {
+  grid-column: 1 / -1;
+}
+
+.wr-opt__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wr-opt__num {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--white);
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.wr-opt__label {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.wr-opt .segmented {
+  display: grid;
+  width: 100%;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 6px;
+}
+
+.wr-opt .seg {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 6px 8px;
+  font-size: 17px;
+  letter-spacing: 0;
+}
+
+/* ผู้เล่นทั่วไป: เห็นค่าที่หัวห้องตั้งไว้ (ตัวที่เลือกเด่น) แต่กดเปลี่ยนไม่ได้ */
+.wr-opt .seg:disabled {
+  cursor: default;
+}
+
+.wr-opt .seg:disabled:not(.seg--active) {
+  opacity: 0.5;
+}
+
+/* ---- Mini Challenge (ใช้ ChallengeCards เดิม ปรับให้เข้ากับการ์ด) ---- */
+.wr .challenge-cards-wrap {
+  margin-top: 0;
+}
+
+.wr .challenge-cards-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.wr .challenge-cards-head .field__label {
+  font-size: 20px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.wr .challenge-count {
+  border-radius: var(--r-pill, 999px);
+  padding: 2px 12px;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.wr .wr-challenge-hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.wr .chal-card {
+  min-height: 72px;
+  padding: 8px 12px;
+  border-width: 2px;
+  border-radius: var(--r-sm, 10px);
+}
+
+/* แต้มสีให้การ์ดแต่ละแบบแยกกันชัด โดยยังอยู่ในพาเลตเดิมของเกม */
+.wr .chal-card {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--wr-challenge-accent, var(--ink));
+  background: var(--wr-challenge-tint, var(--tab-idle));
+  opacity: 1;
+  transition: transform 150ms ease, box-shadow 150ms ease, filter 150ms ease;
+}
+
+.wr .wr-chal-card__icon {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  transform: translateY(-50%);
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  background: var(--wr-challenge-accent, var(--ink));
+  color: #fff;
+  font-size: 21px;
+}
+
+.wr .chal-card:nth-child(1) {
+  --wr-challenge-accent: var(--blue);
+  --wr-challenge-tint: color-mix(in srgb, var(--blue) 13%, var(--white));
+}
+
+.wr .chal-card:nth-child(2) {
+  --wr-challenge-accent: var(--pink-bright, var(--pink));
+  --wr-challenge-tint: color-mix(in srgb, var(--pink-bright, var(--pink)) 13%, var(--white));
+}
+
+.wr .chal-card:nth-child(3) {
+  --wr-challenge-accent: var(--purple);
+  --wr-challenge-tint: color-mix(in srgb, var(--purple) 13%, var(--white));
+}
+
+.wr .chal-card:nth-child(4) {
+  --wr-challenge-accent: var(--green);
+  --wr-challenge-tint: color-mix(in srgb, var(--green) 13%, var(--white));
+}
+
+.wr .chal-card--on {
+  box-shadow: var(--shadow-xs);
+}
+
+.wr .chal-card--host:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+  filter: saturate(1.08);
+}
+
+.wr .chal-card__title,
+.wr .chal-card__desc,
+.wr .chal-card__badge {
+  margin-left: 50px;
+}
+
+.wr .chal-card {
+  display: block;
+  min-height: 88px;
+  padding: 18px 12px 12px;
+  text-align: left;
+}
+
+.wr .chal-card__title {
+  display: block;
+  padding-right: 72px;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.wr .chal-card__desc {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.wr .chal-card__badge {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  min-width: 62px;
+  margin: 0;
+  padding: 3px 7px;
+  border: 2px solid var(--wr-challenge-accent);
+  border-radius: 999px;
+  background: var(--green);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.wr .chal-card__badge--off {
+  background: var(--tab-idle);
+  color: var(--muted);
+  border-color: var(--muted);
+}
+
+/* ---- ผู้เล่น ---- */
+.wr-card--players {
+  flex: 1; /* ยืดเต็มความสูงที่เหลือของคอลัมน์ขวา ปุ่มเริ่มเกมจะอยู่ล่างสุดของการ์ด */
+  display: flex;
+  flex-direction: column;
+}
+
+.wr-card--players .player-list {
+  margin-top: 0;
+}
+
+.wr-card--players.wr-card--waiting .mascot-note {
+  width: min(100%, 160px);
+  max-width: 160px;
+}
+
+.wr-card--players.wr-card--waiting .mascot-note .mascot {
+  width: 96px;
+  max-width: 96px;
+}
+
+.wr-chat {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 12px;
+}
+
+.wr-chat .panel__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.wr-chat .panel__title::before {
+  width: 16px;
+  height: 12px;
+  background: var(--blue);
+  clip-path: polygon(0 0, 100% 0, 100% 72%, 62% 72%, 42% 100%, 40% 72%, 0 72%);
+  content: "";
+}
+
+.wr-chat .chat__list {
+  flex: 1;
+  min-height: 0;
+}
+
+.wr-chat .chat__form {
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+/* ที่นั่งว่างโหมดแข่งเดี่ยว ใช้หน้าตาเดียวกันเพื่อให้กรอบรายชื่อเต็มเป็นระเบียบ */
+.wr-player-list {
+  align-content: start;
+}
+
+.wr-player-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 2px dashed var(--muted);
+  border-radius: var(--r-ctl, 14px);
+  color: var(--muted);
+  background: var(--tab-idle);
+  font-family: var(--font-head);
+  font-size: 15px;
+}
+
+.wr-player-slot span {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.player-card__who {
+  display: grid;
+  min-width: 0;
+}
+
+.player-card__score {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ---- ปุ่มเริ่มเกม / พร้อม ---- */
+.wr-actions {
+  margin-top: auto;
+  padding-top: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.wr-actions__go {
+  width: 100%;
+  min-height: 52px;
+  font-size: 20px;
+}
+
+.wr-actions .form-note {
+  margin: 0;
+  text-align: center;
+  font-size: 14px;
+}
+
+.form-note--ok {
+  color: var(--green);
+  font-weight: 700;
+}
+
+/* ---- โหมดทีม: ฝั่งผู้เล่นต้องกว้างพอให้สองคอลัมน์ทีมแสดงชื่อได้ · ไม่โชว์บรรทัดคะแนน (ในห้องรอเป็น 0 เสมอ) ---- */
+.wr--team .wr__cols {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+}
+
+.wr--team .team-col .player-card__score {
+  display: none;
+}
+
+/* ---- โหมดทีม: แถบความสมดุล + ปุ่มจัดทีม · หัวทีม · ช่องว่างรอคน ---- */
+.wr-balance {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 10px;
+  margin-top: 10px;
+}
+
+.wr-balance__bar {
+  grid-column: 1 / -1;
+  display: flex;
+  height: 28px;
+  overflow: hidden;
+  border: 2px solid var(--ink);
+  border-radius: var(--r-pill, 999px);
+  background: var(--white);
+}
+
+.wr-balance__bar span {
+  flex-basis: 0;
+  min-width: 26px;
+  display: grid;
+  place-items: center;
+  color: var(--white);
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 15px;
+  transition: flex-grow 0.35s ease;
+}
+
+.wr-balance__A {
+  background: var(--team-a);
+}
+
+.wr-balance__B {
+  background: var(--team-b);
+  border-left: 2px solid var(--ink);
+}
+
+.wr-balance__text {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.wr-balance--ok .wr-balance__text {
+  color: var(--green);
+}
+
+.wr-balance--bad .wr-balance__text {
+  color: var(--team-a);
+}
+
+.wr-balance__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 4px 14px;
+  font-size: 15px;
+}
+
+/* ปุ่มจัดทีมเด่นขึ้นเมื่อทีมไม่สมดุล (บอกว่าต้องกดอันนี้) */
+.wr-balance--bad .wr-balance__btn {
+  background: var(--yellow);
+}
+
+.team-col__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.team-col__badge {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  color: var(--white);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.team-col--A .team-col__badge {
+  background: var(--team-a);
+}
+
+.team-col--B .team-col__badge {
+  background: var(--team-b);
+}
+
+.team-col__count small {
+  font-size: 12px;
+}
+
+/* ช่องว่าง = ที่นั่งที่ยังรอคนเข้าทีม (สูงเท่าการ์ดผู้เล่น) */
+.team-slot {
+  display: grid;
+  place-items: center;
+  min-height: 52px;
+  border: 2px dashed var(--muted);
+  border-radius: var(--r-ctl, 14px);
+  color: var(--muted);
+  font-family: var(--font-head);
+  font-size: 14px;
+  opacity: 0.75;
+}
+
+.team-col--A .team-slot {
+  border-color: var(--team-a);
+  color: var(--team-a);
+}
+
+.team-col--B .team-slot {
+  border-color: var(--team-b);
+  color: var(--team-b);
+}
+
+.team-col__join:disabled {
+  cursor: not-allowed;
+}
+
+/* ---- ฝั่งตั้งค่าแคบ (โหมดทีม · ไอแพดแนวนอน): ปุ่มเลือกค่าเล็กลง ให้เลข 1–5 อยู่แถวเดียว ---- */
+.wr--team .wr-opt .seg {
+  min-width: 36px;
+  padding: 4px 8px;
+}
+
+@media (max-width: 1180px) {
+  .wr-opt .segmented {
+    gap: 5px;
+  }
+
+  .wr-opt .seg,
+  .wr--team .wr-opt .seg {
+    min-width: 34px;
+    padding: 4px 7px;
+  }
+}
+
+/* ---- จอแคบ: คอลัมน์เดียว ---- */
+@media (max-width: 1000px) {
+  .wr__cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* ผู้เล่นทั่วไปอยากเห็นรายชื่อ/ปุ่มพร้อมก่อน ส่วนหัวห้องตั้งค่าก่อนแล้วค่อยกดเริ่มที่ล่าง */
+  .wr--guest .wr__right {
+    order: -1;
+  }
+
+  .wr-bar__right {
+    margin-left: 0;
+  }
+
+  .wr-chat {
+    min-height: 220px;
+  }
+}
+
+@media (max-width: 560px) {
+  .wr {
+    padding: 12px;
+  }
+
+  .wr-opts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wr-card {
+    padding: 12px;
+  }
+
+  .wr .challenge-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wr .wr-challenge-hint {
+    display: none;
+  }
+}
+
+/* ===== ทีม C / D (เลือก 3–4 ทีม) · สีทีมอยู่ใน theme.css ===== */
+.wr-balance__C {
+  background: var(--team-c);
+  border-left: 2px solid var(--ink);
+}
+
+.wr-balance__D {
+  background: var(--team-d);
+  border-left: 2px solid var(--ink);
+}
+
+.team-col--C .team-col__badge { background: var(--team-c); }
+.team-col--D .team-col__badge { background: var(--team-d); }
+.team-col--C .team-slot { border-color: var(--team-c); color: var(--team-c); }
+.team-col--D .team-slot { border-color: var(--team-d); color: var(--team-d); }
+
+/* ==========================================================================
+   พอดีจอ (จอคอม ≥ 1001px กว้าง และสูง ≥ 600px): เปิดหน้าห้องรอแล้วเห็นครบ ไม่ต้องเลื่อนหน้า
+     - ช่องตั้งค่า 6 ช่องเรียง 3 แถว × 2 คอลัมน์เท่ากัน (ไม่มีช่องกว้างโดดเดี่ยว)
+     - Mini Challenge เรียง 4 ใบในแถวเดียว · กติกาย้ายเป็นปุ่ม "กติกา" บนแถบรหัสห้อง
+     - ถ้าผู้เล่นเยอะจนเกินที่ ให้เลื่อนเฉพาะรายชื่อในการ์ดผู้เล่น ไม่เลื่อนทั้งหน้า
+   จอเล็ก/จอเตี้ยกว่านี้ใช้เลย์เอาต์เดิม (เลื่อนหน้าได้)
+   ========================================================================== */
+.wr-rules-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-top: 0;
+  padding: 6px 16px;
+}
+
+@media (min-width: 1001px) and (min-height: 600px) {
+  .screen--waiting {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    gap: 8px;
+    padding: 8px 16px 12px;
+  }
+
+  .wr-topbar,
+  .wr {
+    max-width: none;
+  }
+
+  .wr {
+    flex: 1;
+    min-height: 0;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .wr__cols {
+    min-height: 0;
+    gap: 12px;
+  }
+
+  .wr__left,
+  .wr__right {
+    min-height: 0;
+    gap: 10px;
+  }
+
+  .wr__right {
+    display: grid;
+    grid-template-rows: minmax(0, 1.55fr) minmax(170px, 0.65fr);
+  }
+
+  .wr__left {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    align-content: stretch;
+  }
+
+  .wr__left > .wr-card {
+    min-height: 0;
+  }
+
+  .wr-card--settings,
+  .wr-card--challenges {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .wr-card--challenges {
+    flex: 0 0 auto;
+  }
+
+  .wr-card--challenges .challenge-cards-wrap {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+  }
+
+  /* ซ้าย: ตั้งค่า (ยืดตามเนื้อหา) + Mini Challenge (เต็มที่เหลือ) */
+  .wr__left .wr-card {
+    padding: 10px 12px;
+  }
+
+  .wr-card__head {
+    margin-bottom: 8px;
+  }
+
+  .wr-card__title {
+    font-size: 18px;
+  }
+
+  .wr-opts {
+    flex: 1;
+    gap: 8px;
+    grid-auto-rows: minmax(0, 1fr);
+  }
+
+  .wr-opt {
+    align-content: center;
+    gap: 4px;
+    padding: 4px 8px;
+  }
+
+  .wr-opt .seg,
+  .wr--team .wr-opt .seg {
+    min-height: 34px;
+    padding: 2px 8px;
+  }
+
+  .wr .challenge-cards-head {
+    margin-bottom: 8px;
+  }
+
+  .wr .challenge-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(82px, auto));
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .wr .chal-card {
+    align-content: center;
+    min-height: 82px;
+    padding: 16px 10px 10px;
+  }
+
+  .wr .chal-card__badge {
+    min-width: 58px;
+    padding: 2px 6px;
+    font-size: 12px;
+  }
+
+  .wr .chal-card__desc {
+    font-size: 12px;
+    line-height: 1.25;
+  }
+
+  /* ขวา: การ์ดผู้เล่นเต็มความสูง · รายชื่อเลื่อนเองในกรอบถ้าล้น · ปุ่มเริ่มเกมติดล่างเสมอ */
+  .wr-card--players {
+    min-height: 0;
+    padding: 10px 12px;
+  }
+
+  .wr-card--players .wr-card__head {
+    margin-bottom: 8px;
+  }
+
+  .wr-card--players > .player-list,
+  .wr-card--players > .team-cols {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .wr-card--players > .team-cols {
+    flex: 1;
+    align-content: start;
+  }
+
+  .wr-card--players > .player-list {
+    flex: 1;
+  }
+
+  .wr-card--players > .wr-player-list {
+    grid-auto-rows: minmax(38px, 1fr);
+  }
+
+  .wr-card--players .player-card {
+    min-height: 44px;
+  }
+
+  .team-slot {
+    min-height: 40px;
+  }
+
+  .wr-actions {
+    padding-top: 8px;
+    gap: 4px;
+  }
+
+  .wr-actions__go {
+    min-height: 46px;
+    font-size: 18px;
+  }
+
+  .wr-card--players .mascot-note {
+    display: grid;
+  }
+
+  .wr-card--players.wr-card--waiting > .player-list {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .wr-card--players.wr-card--waiting > .team-cols {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .wr-card--players.wr-card--waiting .mascot-note {
+    flex: 1;
+    width: min(100%, 160px);
+    max-width: 160px;
+    margin: 4px auto;
+    align-content: center;
+  }
+
+  .wr-card--players.wr-card--waiting .mascot-note .mascot {
+    width: 72px;
+    max-width: 72px;
+  }
+
+  .wr-card--players.wr-card--waiting .mascot-note .mascot-note__text {
+    padding: 3px 8px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .wr-chat {
+    min-height: 0;
+    padding: 10px 12px;
+  }
+
+  .wr-chat .panel__title {
+    margin-bottom: 6px;
+    font-size: 17px;
+  }
+
+  .wr-chat .chat__form {
+    gap: 6px;
+  }
+
+  .wr-chat .chat__input {
+    min-width: 0;
+  }
+
+  /* แถบสมดุล: แถบสี + ข้อความ + ปุ่มจัดทีม อยู่แถวเดียว (ประหยัดความสูง) */
+  .wr-balance {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    margin-top: 0;
+    gap: 8px 10px;
+  }
+
+  .wr-balance__bar {
+    grid-column: auto;
+    height: 26px;
+  }
+
+  .wr-balance__btn {
+    min-height: 38px;
+    padding: 4px 12px;
+  }
+
+  /* การ์ดทีม: แน่นขึ้น · ปุ่มย้ายทีมเตี้ยลง */
+  .wr-card--players .team-cols {
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .wr-card--players .team-col {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .wr-card--players .team-col .player-list {
+    gap: 6px;
+  }
+
+  .wr-card--players .team-col .player-card {
+    min-height: 0;
+    padding: 3px 10px;
+    gap: 8px;
+  }
+
+  .wr-card--players .team-col .player-card--me {
+    padding: 0 7px;
+  }
+
+  .wr-card--players .team-col .avatar-chip {
+    width: 32px;
+    height: 32px;
+  }
+
+  .wr-card--players .team-col .player-card__name {
+    font-size: 16px;
+  }
+
+  .wr-card--players .team-col .team-slot {
+    min-height: 34px;
+  }
+
+  .wr-card--players .team-col__join {
+    min-height: 36px;
+    padding: 2px 10px;
+    font-size: 15px;
+  }
+
+  .wr-card--players .team-col__title {
+    margin: 0;
+  }
+}
+
+@media (min-width: 1001px) and (min-height: 600px) and (max-height: 760px) {
+  .wr__left {
+    grid-template-rows: minmax(285px, 1fr) auto;
+  }
+
+  .wr__left .wr-card {
+    padding: 7px 9px;
+  }
+
+  .wr-card--settings .wr-card__head {
+    margin-bottom: 5px;
+  }
+
+  .wr-opts {
+    gap: 5px;
+  }
+
+  .wr-opt {
+    gap: 3px;
+    padding: 3px 6px;
+  }
+
+  .wr-opt__label {
+    font-size: 13px;
+  }
+
+  .wr-opt .seg,
+  .wr--team .wr-opt .seg {
+    min-width: 0;
+    min-height: 40px;
+    padding: 3px 5px;
+    font-size: 15px;
+  }
+
+  .wr .chal-card__desc {
+    display: none;
+  }
+
+  .wr .chal-card {
+    min-height: 62px;
+    padding-top: 14px;
+  }
+
+  .wr .challenge-cards {
+    grid-template-rows: repeat(2, minmax(62px, auto));
+  }
+
+  .wr .wr-chal-card__icon {
+    left: 8px;
+    width: 28px;
+    height: 28px;
+    font-size: 16px;
+  }
+
+  .wr .chal-card__title {
+    margin-left: 38px;
+    padding-right: 62px;
+    font-size: 13px;
+  }
+
+  .wr .chal-card__badge {
+    top: 4px;
+    right: 5px;
+    min-width: 52px;
+    padding: 1px 4px;
+    font-size: 11px;
+  }
+
+  .wr .wr-challenge-hint {
+    display: none;
+  }
+
+  .wr-card--players.wr-card--waiting .wr-actions {
+    padding-top: 4px;
+    gap: 2px;
+  }
+
+  .wr-card--players.wr-card--waiting .wr-actions .form-note {
+    font-size: 12px;
+    line-height: 1.2;
+  }
+}

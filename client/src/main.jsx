@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App.jsx";
 import "./styles/theme.css";
 import "./styles/arcade.css"; // ธีม Neo-Arcade (ชั้นทับ: สี ฟอนต์ มุมโค้ง) — ลบบรรทัดนี้ = กลับธีมพิกเซลเดิม
+import "./styles/waitingroom.css"; // หน้าห้องรอแบบสองฝั่ง (ต้องอยู่หลัง theme/arcade เพื่อชนะ selector ระดับเดียวกัน)
 import "./prefs"; // ตั้ง data-motion ที่ <html> ก่อน React วาดหน้าแรก
 
 // BrowserRouter ผูกหน้าจอเข้ากับ URL (/ · /setup · /room/12345 · /leaderboard · /solo)
