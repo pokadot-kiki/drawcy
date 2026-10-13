@@ -248,6 +248,7 @@ export default function App() {
       {route.screen === "solo" && (
         <SoloAI
           initialName={profile.name}
+          avatar={profile.avatar}
           boot={soloBoot}
           onName={(name) => setProfile((p) => ({ ...p, name }))}
           onBack={() => {

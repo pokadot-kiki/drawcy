@@ -1766,29 +1766,6 @@ select[class] {
   color: var(--muted);
 }
 
-/* หน้าเล่น: ใช้โครงเดียวกับหน้าเกม แต่ไม่มีคอลัมน์รายชื่อ เหลือ กระดาน + เครื่องมือ
-   (จอ ≤1000px กลับเป็นคอลัมน์เดียวตามกฎเดิมของ .game ซึ่งชนะด้วยลำดับในไฟล์ จึงต้องเขียนซ้ำใน media ด้านล่าง) */
-.game--solo {
-  grid-template-columns: minmax(0, 1fr) 240px;
-}
-
-@media (min-width: 1001px) and (max-width: 1400px) {
-  .game--solo {
-    grid-template-columns: minmax(0, 1fr) 232px;
-  }
-}
-
-@media (max-width: 1000px) {
-  .game--solo {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* กล่อง AI อยู่ใต้กระดานกล่องเดียว กว้างเต็ม สูง 176px เท่ากล่องของหน้าเกม (งบที่เผื่อไว้ใต้กระดานจึงไม่เปลี่ยน) */
-.game__answers--solo {
-  grid-template-columns: minmax(0, 1fr);
-}
-
 .ai-box__body {
   flex: 1;
   min-height: 0;
@@ -1829,7 +1806,7 @@ select[class] {
 
 .ai-box__leave {
   align-self: flex-end;
-  min-height: 32px;
+  min-height: 44px; /* ปุ่มกดง่าย ≥44px ตาม DESIGN.md (เดิม 32px) */
   font-size: 13px;
 }
 
@@ -3641,15 +3618,6 @@ select[class] {
   box-shadow: var(--shadow-xs);
 }
 
-/* Solo (จอคอม): คอลัมน์กลางกว้างกว่ากระดาน → แถบคำกว้างเท่ากระดานและอยู่กลาง ขอบตรงกับกระดานเหมือนหน้าเกมปกติ */
-@media (min-width: 1001px) {
-  .game--solo .wordbar {
-    width: 100%;
-    max-width: max(320px, calc((100dvh - 402px) * 4 / 3));
-    margin: 0 auto;
-  }
-}
-
 /* ---- ปุ่มเพลง/เสียงของหน้าที่ไม่มีแถบบน: มุมขวาบนของหน้า (หน้าที่มีแถบบนใช้กลุ่มไอคอนในแถบแทน) ---- */
 .audio-dock {
   position: fixed;
@@ -4600,68 +4568,6 @@ select[class] {
   gap: 8px;
 }
 
-/* ==========================================================================
-   Solo: กล่อง "พิมพ์คำตอบ" ย้ายไปคอลัมน์ขวา ใต้กล่องเครื่องมือ (กว้างเท่าเครื่องมือ)
-   เครื่องมืออยู่บน (order 0) · กล่องคำตอบเต็มพื้นที่ที่เหลือจนถึงขอบล่างของกระดาน (order 1)
-   กระดานขนาดเท่าเดิม (คอลัมน์กลางไม่เปลี่ยน) · มือถือ side ลงไปอยู่ใต้กระดาน
-   ========================================================================== */
-.game__side {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-}
-
-.game__side .game__tools {
-  order: 0;
-}
-
-.game__side .game__answers--solo {
-  order: 1;
-  display: flex; /* ลูกเดียว (ai-box) ยืดเต็มกล่อง */
-  min-width: 0;
-}
-
-.game__side .game__answers--solo .panel {
-  width: 100%;
-}
-
-@media (min-width: 1001px) {
-  /* side ยืดสูงเท่ากระดาน (คอลัมน์กริดเดียวกัน) → กล่องคำตอบกินพื้นที่ที่เหลือใต้เครื่องมือ */
-  .game--solo {
-    align-items: stretch;
-  }
-  .game__side {
-    align-self: stretch;
-    min-height: 0;
-  }
-  .game__side .game__answers--solo {
-    flex: 1;
-    min-height: 0;
-  }
-  /* ทับความสูง 176px ของ .game__answers .panel สำหรับ Solo เท่านั้น ให้ยืดเต็มแทน */
-  .game__side .game__answers--solo .panel {
-    height: auto;
-    flex: 1;
-    min-height: 0;
-  }
-}
-
-@media (max-width: 1000px) {
-  /* มือถือ: กล่องคำตอบความสูงคงที่ อ่าน/เลื่อนรายการคำที่ทายผิดได้ ช่องพิมพ์อยู่ล่างสุด */
-  .game__side .game__answers--solo .panel {
-    height: 240px;
-  }
-}
-
-/* Solo มือถือ: .game__side (เครื่องมือ+คำตอบ) ต้องอยู่ "ใต้" กระดาน
-   (กฎ order ของ .game ตอนจอเล็กทำให้ board order:1 ไปอยู่หลัง side order:0 โดยไม่ตั้งใจ) */
-@media (max-width: 1000px) {
-  .game--solo .game__side {
-    order: 6;
-  }
-}
-
 /* ===== ทีม C / D (หัวห้องเลือก 3–4 ทีม) — หน้าตาเหมือนทีม A/B เปลี่ยนแค่สี ===== */
 .team-col--C { background: var(--team-c-soft); border-color: var(--team-c); }
 .team-col--D { background: var(--team-d-soft); border-color: var(--team-d); }
@@ -4921,3 +4827,23 @@ select[class] {
     font-size: 22px;
   }
 }
+
+/* ==========================================================================
+   Solo แข่งกับ AI ใช้โครงหน้าเกมปกติทั้งหมด (ui-fixes-4)
+   หน้า Solo ใช้คลาสเดียวกับ Game.jsx (.game__players .game__stage .game__answers .game__tools)
+   กฎ layout/เครื่องมือทั้งหมดด้านบนจึงใช้กับ Solo ด้วย (ตัวเลือก .game:not(.game--solo) ยังตรง เพราะ Solo ใช้คลาส game--ai)
+   ด้านล่างคือของที่มีเฉพาะ Solo เท่านั้น
+   ========================================================================== */
+
+/* คอลัมน์ซ้าย: ข้อความบอกโหมด AI ใต้แถว "คุณ" กับ "AI" */
+.game--ai .game__players .ai-box__mode {
+  margin: 12px 4px 0;
+  line-height: 1.45;
+}
+
+/* กล่องใต้กระดาน (ที่เดียวกับ "ในห้อง"): หัวข้อ · เนื้อหาเลื่อนได้ · ลิงก์ออกจากเกมชิดขวาล่าง */
+.game--ai .panel--room.ai-box {
+  display: flex;
+  flex-direction: column;
+}
+

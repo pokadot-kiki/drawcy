@@ -23,6 +23,8 @@ export default function Chat({
   title = "คำตอบ",
   emptyText = "พิมพ์ทายคำที่นี่",
   placeholder = "ทายคำ...",
+  disabledPlaceholder = "คุณกำลังวาดอยู่", // ข้อความในช่องตอนพิมพ์ไม่ได้ (Solo ใช้ข้อความอื่น)
+  maxLength = 100, // Solo ช่วง 2 ใช้ 40 ตามเพดานที่ server รับ
   className = "panel panel--answers",
 }) {
   const [text, setText] = useState("");
@@ -76,9 +78,9 @@ export default function Chat({
           className="input chat__input"
           type="text"
           value={text}
-          maxLength={100}
+          maxLength={maxLength}
           disabled={disabled}
-          placeholder={disabled ? "คุณกำลังวาดอยู่" : placeholder}
+          placeholder={disabled ? disabledPlaceholder : placeholder}
           aria-label={title === "คำตอบ" ? "ช่องทายคำ" : "ช่องแชทรอห้อง"}
           onChange={(e) => setText(e.target.value)}
         />

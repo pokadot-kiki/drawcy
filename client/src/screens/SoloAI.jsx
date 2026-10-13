@@ -16,6 +16,9 @@ import { play } from "../sound/sfx";
 import { beginStroke, extendStroke, endStroke, clearBoard } from "../canvas/actions";
 import { PAINT_COLORS, SIZE_DEFAULT, TOOLS } from "../canvas/palette";
 import { Icon } from "../components/Icons";
+import Chat from "../components/Chat";
+import Avatar from "../components/Avatar";
+import YouTag from "../components/YouTag";
 import { Sparkles, PAGE_SPARKLES } from "../components/Critter";
 
 // ส่งภาพให้ AI ดูทุก 5 วินาที (server รับห่างกันได้ไม่ต่ำกว่า 4 วิ)
@@ -58,7 +61,7 @@ const DIFFICULTIES = [
   ["hard", "ยาก"],
 ];
 
-export default function SoloAI({ initialName = "", boot = null, onName, onBack }) {
+export default function SoloAI({ initialName = "", avatar = 0, boot = null, onName, onBack }) {
   // intro = กรอกชื่อ · starting = ส่ง ai_start แล้วรอด่านแรก · playing = ช่วง 1 เราวาด AI ทาย
   // watch = ช่วง 2 ดูภาพที่เล่นซ้ำแล้วพิมพ์ทาย · rest = พักระหว่างช่วง · over = จบเกม
   const [phase, setPhase] = useState("intro");
@@ -69,7 +72,6 @@ export default function SoloAI({ initialName = "", boot = null, onName, onBack }
   const [difficulty, setDifficulty] = useState(boot?.difficulty ?? "easy");
   const [round, setRound] = useState(null); // { level, word, time, lives, aiMode, drawNext }
   const [watch, setWatch] = useState(null); // ช่วง 2: { level, time, lives, category } (ไม่มีคำตอบ)
-  const [answer, setAnswer] = useState(""); // ช่องพิมพ์ทายของช่วง 2
   const [wrongAnswers, setWrongAnswers] = useState([]); // คำที่เราทายผิดในช่วง 2
   const [roundId, setRoundId] = useState(0); // นับขึ้นทุกด่าน ไว้สั่งล้างกระดาน
   const [lives, setLives] = useState(3);
@@ -192,7 +194,6 @@ export default function SoloAI({ initialName = "", boot = null, onName, onBack }
       setLives(d.lives);
       setTimeLeft(d.time);
       setResult(null);
-      setAnswer("");
       setWrongAnswers([]);
       canvasRef.current?.resetBoard();
       redoRef.current = [];
@@ -337,12 +338,10 @@ export default function SoloAI({ initialName = "", boot = null, onName, onBack }
   }
 
   // ช่วง 2: ส่งคำที่พิมพ์ให้ server ตัดสิน (ฝั่งนี้ไม่รู้คำตอบเลย)
-  function sendAnswer(e) {
-    e.preventDefault();
-    const text = answer.trim();
+  // ช่วง 2: ส่งคำทาย (กล่อง Chat ตัดช่องว่างและกันข้อความว่างให้แล้ว) — ส่งแบบเดิมทุกอย่าง
+  function sendGuess(text) {
     if (phase !== "watch" || !text) return;
     socket.emit("ai_draw_guess", { text });
-    setAnswer("");
   }
 
   function handleLeave() {
@@ -462,6 +461,8 @@ export default function SoloAI({ initialName = "", boot = null, onName, onBack }
     </span>
   );
   const lastGuess = guesses[guesses.length - 1];
+  // หน้าจอฝั่ง "ช่วง 2" (AI วาด เราทาย) รวมหน้าต่างเฉลยของช่วง 2 ด้วย · นอกนั้นเป็นฝั่ง "ช่วง 1" (เราวาด AI ทาย)
+  const drawView = !(phase === "watch" || (phase === "rest" && result?.kind === "guess"));
 
   return (
     <div className="screen screen--game">
@@ -493,31 +494,80 @@ export default function SoloAI({ initialName = "", boot = null, onName, onBack }
         <TopIcons onInfo={() => setShowInfo(true)} onExit={() => setShowExit(true)} />
       </header>
 
-      <main className="game game--solo">
+      {/* โครงเดียวกับหน้าเกมปกติ (Game.jsx) ทุกชิ้น: ซ้าย = ผู้เล่น · กลาง = แถบคำ/กระดาน/แถบเวลา/กล่องใต้กระดาน
+          · ขวา = เครื่องมือ + กล่องคำตอบ — ใช้คลาสชุดเดียวกัน CSS ของหน้าเกมจึงใช้กับ Solo ได้เลย ไม่ต้องคัดลอก
+          ส่วนที่เฉพาะของ Solo วางลงช่องที่ทำหน้าที่เดียวกัน: คุณ vs AI ในช่องรายชื่อ · "AI คิดว่า" ในช่อง "ในห้อง"
+          · คำที่ AI เดา/คำที่เราทาย ในช่อง "คำตอบ" */}
+      <main className="game game--ai">
+        <aside className="game__players" aria-label="ผู้เล่น">
+          <ul className="score-list">
+            <li className={`score-row score-row--me${drawView && live ? " score-row--drawer" : ""}`}>
+              <span className="score-row__avatar">
+                <Avatar index={avatar} large />
+              </span>
+              <span className="score-row__main">
+                <span className="score-row__name">{name}</span>
+                <span className="score-row__tags">
+                  <YouTag />
+                  {drawView && live && (
+                    <span className="tag tag--drawing" title="กำลังวาด">
+                      <Icon name="pen" size={13} />
+                    </span>
+                  )}
+                </span>
+              </span>
+              <span className="score-row__score">
+                <AnimatedNumber value={score} />
+              </span>
+            </li>
+            <li className={`score-row${!drawView && live ? " score-row--drawer" : ""}`}>
+              <span className="score-row__avatar">
+                <span className="avatar-chip avatar-chip--lg" aria-hidden="true">
+                  <Icon name="robot" size={32} />
+                </span>
+              </span>
+              <span className="score-row__main">
+                <span className="score-row__name">AI</span>
+                <span className="score-row__tags">
+                  {!drawView && live && (
+                    <span className="tag tag--drawing" title="กำลังวาด">
+                      <Icon name="pen" size={13} />
+                    </span>
+                  )}
+                </span>
+              </span>
+              <span className="score-row__score" />
+            </li>
+          </ul>
+          {round && MODE_TEXT[round.aiMode] && (
+            <p className={`ai-box__mode${round.aiMode === "mock" ? " ai-box__mode--mock" : ""}`}>{MODE_TEXT[round.aiMode]}</p>
+          )}
+        </aside>
+
         <section className="game__stage">
           {/* แถบคำเหนือกระดาน เหมือนหน้าเกมปกติ: ซ้าย = ป้ายบอกช่วง · กลาง = คำที่ต้องวาด (หรือหมวดของภาพในช่วง 2) */}
           <div className="wordbar">
             <div className="wordbar__side">
               {/* ป้ายบอกช่วง: ช่วง 1 ขึ้นเฉพาะด่านที่มีช่วง 2 ต่อท้าย */}
-          {phase === "watch" ? (
-            <div className="solo-stage solo-stage--watch">ช่วง 2/2 · ดูภาพแล้วพิมพ์ทาย</div>
-          ) : (phase === "playing" || (phase === "rest" && result?.kind === "draw")) && round?.drawNext ? (
-            <div className="solo-stage">ช่วง 1/2 · คุณวาด AI ทาย</div>
-          ) : null}
+              {phase === "watch" ? (
+                <div className="solo-stage solo-stage--watch">ช่วง 2/2 · ดูภาพแล้วพิมพ์ทาย</div>
+              ) : (phase === "playing" || (phase === "rest" && result?.kind === "draw")) && round?.drawNext ? (
+                <div className="solo-stage">ช่วง 1/2 · คุณวาด AI ทาย</div>
+              ) : null}
             </div>
-          <div className="wordbar__word">
-            {phase === "watch" && watch ? (
-              <span className="topbar__idle" title="หมวดหมู่ของภาพ">
-                ภาพนี้คืออะไร? {watch.category && <>หมวด: <b>{watch.category}</b></>}
-              </span>
-            ) : round && phase !== "starting" ? (
-              <span className="topbar__real-word" title="คำที่คุณต้องวาด">
-                {round.word}
-              </span>
-            ) : (
-              <span className="topbar__idle">กำลังเริ่มเกม...</span>
-            )}
-          </div>
+            <div className="wordbar__word">
+              {phase === "watch" && watch ? (
+                <span className="topbar__idle" title="หมวดหมู่ของภาพ">
+                  ภาพนี้คืออะไร? {watch.category && <>หมวด: <b>{watch.category}</b></>}
+                </span>
+              ) : round && phase !== "starting" ? (
+                <span className="topbar__real-word" title="คำที่คุณต้องวาด">
+                  {round.word}
+                </span>
+              ) : (
+                <span className="topbar__idle">กำลังเริ่มเกม...</span>
+              )}
+            </div>
             <div className="wordbar__side wordbar__side--end" />
           </div>
           <Canvas
@@ -537,91 +587,85 @@ export default function SoloAI({ initialName = "", boot = null, onName, onBack }
           />
 
           <TimeBar timeLeft={live ? timeLeft : null} total={stage?.time ?? null} />
-        </section>
 
-        {/* คอลัมน์ขวา: เครื่องมือวาด (บน) + กล่องพิมพ์คำตอบ (ล่าง เต็มพื้นที่ที่เหลือจนถึงขอบล่างของกระดาน)
-            ใช้ flex order ให้เครื่องมืออยู่บน แม้กล่องคำตอบมาก่อนใน DOM · บนมือถือ side ลงไปอยู่ใต้กระดาน */}
-        <aside className="game__side">
-          <div className="game__answers game__answers--solo">
-            {phase === "watch" ? (
-              <section className="panel ai-box" aria-live="polite">
-                <h2 className="panel__title">พิมพ์คำตอบ</h2>
-                <div className="ai-box__body">
-                  <p className="ai-box__hint">
-                    ภาพนี้เป็นการเล่นซ้ำภาพที่คนจริงเคยวาด (ชุดข้อมูล Google Quick, Draw!) ไม่ใช่ AI สร้างภาพเอง
-                  </p>
-                  {wrongAnswers.length > 0 && (
-                    <p className="ai-box__past">ทายผิดไปแล้ว: {wrongAnswers.join(" · ")}</p>
-                  )}
-                </div>
-                <form className="chat__form" onSubmit={sendAnswer}>
-                  <input
-                    className="input chat__input"
-                    value={answer}
-                    onChange={(e) => setAnswer(e.target.value)}
-                    maxLength={MAX_GUESS_CHARS}
-                    placeholder="พิมพ์คำที่คิดว่าใช่ แล้วกด Enter"
-                    autoComplete="off"
-                    aria-label="พิมพ์คำตอบ"
-                    autoFocus
-                  />
-                  <button type="submit" className="btn btn--primary" disabled={!answer.trim()}>
-                    ทาย
-                  </button>
-                </form>
-                <button type="button" className="link-btn ai-box__leave" onClick={() => setShowExit(true)}>
-                  ออกจากเกม (ไม่บันทึกคะแนน)
-                </button>
-              </section>
+          {/* สองกล่องเหมือนหน้าเกมปกติ: "คำตอบ" (จอคอมไปอยู่ขวาใต้เครื่องมือ) กับกล่องใต้กระดาน (ที่ของ "ในห้อง") */}
+          <div className="game__answers">
+            {drawView ? (
+              <Chat
+                key="draw"
+                title="คำที่ AI เดา"
+                emptyText={thinking ? "AI กำลังดูภาพ..." : "วาดเลย AI จะดูภาพทุก 5 วินาที"}
+                messages={guesses.map((g) => ({ name: "AI", text: g.text, correct: g.correct }))}
+                disabled
+                autoFocus={false}
+                onSend={() => {}}
+              />
             ) : (
-            <section className="panel ai-box" aria-live="polite">
-              <h2 className="panel__title">AI คิดว่า...</h2>
-              <div className="ai-box__body">
-                {lastGuess ? (
-                  <p className={`ai-box__guess${lastGuess.correct ? " ai-box__guess--ok" : ""}`}>
-                    <Icon name={lastGuess.correct ? "check" : "question"} size={24} /> {lastGuess.text}
-                  </p>
-                ) : (
-                  <p className="ai-box__hint">
-                    {thinking ? "กำลังดูภาพ..." : "วาดเลย AI จะดูภาพทุก 5 วินาที"}
-                  </p>
-                )}
-                {lastGuess && thinking && <p className="ai-box__hint">กำลังดูภาพใหม่...</p>}
-                {guesses.length > 1 && (
-                  <p className="ai-box__past">
-                    ก่อนหน้า: {guesses.slice(0, -1).map((g) => g.text).join(" · ")}
-                  </p>
-                )}
-              </div>
-              {round && MODE_TEXT[round.aiMode] && (
-                <p className={`ai-box__mode${round.aiMode === "mock" ? " ai-box__mode--mock" : ""}`}>
-                  {MODE_TEXT[round.aiMode]}
-                </p>
+              <Chat
+                key="watch"
+                title="คำตอบ"
+                emptyText="พิมพ์ทายว่าภาพนี้คืออะไร"
+                messages={wrongAnswers.map((text) => ({ name: name || "คุณ", text, playerId: "me" }))}
+                meId="me"
+                disabled={phase !== "watch"}
+                disabledPlaceholder="รอสักครู่..."
+                placeholder="พิมพ์คำทาย..."
+                maxLength={MAX_GUESS_CHARS}
+                onSend={sendGuess}
+              />
+            )}
+
+            <section className="panel panel--room ai-box" aria-live="polite">
+              {drawView ? (
+                <>
+                  <h2 className="panel__title">AI คิดว่า...</h2>
+                  <div className="ai-box__body">
+                    {lastGuess ? (
+                      <p className={`ai-box__guess${lastGuess.correct ? " ai-box__guess--ok" : ""}`}>
+                        <Icon name={lastGuess.correct ? "check" : "question"} size={24} /> {lastGuess.text}
+                      </p>
+                    ) : (
+                      <p className="ai-box__hint">{thinking ? "กำลังดูภาพ..." : "วาดเลย AI จะดูภาพทุก 5 วินาที"}</p>
+                    )}
+                    {lastGuess && thinking && <p className="ai-box__hint">กำลังดูภาพใหม่...</p>}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2 className="panel__title">ภาพนี้คืออะไร?</h2>
+                  <div className="ai-box__body">
+                    <p className="ai-box__guess">
+                      <Icon name="pen" size={24} /> AI กำลังวาด ทายในกล่อง "คำตอบ"
+                    </p>
+                    <p className="ai-box__hint">
+                      ภาพนี้เป็นการเล่นซ้ำภาพที่คนจริงเคยวาด (ชุดข้อมูล Google Quick, Draw!) ไม่ใช่ AI สร้างภาพเอง
+                    </p>
+                  </div>
+                </>
               )}
               <button type="button" className="link-btn ai-box__leave" onClick={() => setShowExit(true)}>
                 ออกจากเกม (ไม่บันทึกคะแนน)
               </button>
             </section>
-            )}
           </div>
+        </section>
 
-          <div className="game__tools">
-            <Toolbar
-              tool={tool}
-              color={color}
-              size={size}
-              onTool={setToolChoice}
-              onColor={setColor}
-              onSize={setSize}
-              onClear={() => canvasRef.current?.dispatch(clearBoard())}
-              onUndo={undo}
-              onRedo={redo}
-              canUndo={hist.undo}
-              canRedo={hist.redo}
-              locked={!canDraw}
-              maxSize={SOLO_MAX_SIZE}
-            />
-          </div>
+        <aside className="game__tools">
+          <Toolbar
+            tool={tool}
+            color={color}
+            size={size}
+            onTool={setToolChoice}
+            onColor={setColor}
+            onSize={setSize}
+            onClear={() => canvasRef.current?.dispatch(clearBoard())}
+            onUndo={undo}
+            onRedo={redo}
+            canUndo={hist.undo}
+            canRedo={hist.redo}
+            locked={!canDraw}
+            maxSize={SOLO_MAX_SIZE}
+          />
         </aside>
       </main>
 
