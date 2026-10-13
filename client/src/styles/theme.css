@@ -4679,7 +4679,7 @@ select[class] {
   .game:not(.game--solo) .toolbar {
     height: 100%;
     justify-content: space-between;
-    gap: 5px; /* เดิม 3px ซึ่งเบียดจนดูเป็นก้อนเดียว */
+    gap: 4px; /* เดิม 3px ซึ่งเบียดจนดูเป็นก้อนเดียว · 5px ทำให้กล่องสูงกว่ากระดาน 1px ที่ 1440×780 แล้วหน้าเลื่อน */
   }
 
   .toolbar__group--colors {
@@ -4847,3 +4847,21 @@ select[class] {
   flex-direction: column;
 }
 
+/* มือถือ/แท็บเล็ต (≤1000px) — บั๊กเดิมของหน้าเกมที่ใช้ร่วมกัน เจอตอนเทียบหน้า Solo:
+   รายชื่อผู้เล่นเรียงแนวนอน (grid-auto-flow: column) แต่กฎฐาน grid-template-columns: minmax(0, 1fr)
+   ทำให้ "คอลัมน์แรก" เป็นคอลัมน์ที่ประกาศไว้แล้วหดได้ถึง 0 → แถวแรก (มักเป็นตัวเรา) เหลือแค่อวตาร ชื่อ/คะแนนหาย
+   ยกเลิกคอลัมน์ที่ประกาศไว้ ให้ทุกแถวใช้ grid-auto-columns เท่ากันหมด */
+@media (max-width: 1000px) {
+  .score-list {
+    grid-template-columns: none;
+  }
+}
+
+/* มือถือ (≤620px) แถบคำเรียงบนลงล่าง (ป้าย → คำ) แต่ความสูงตายตัว 66px ตัดบรรทัดที่สองทิ้ง
+   (เห็นชัดตอนมีป้ายช่วงของ Solo หรือป้าย Mini Challenge) → ให้สูงตามเนื้อหา */
+@media (max-width: 620px) {
+  .wordbar {
+    height: auto;
+    min-height: 66px;
+  }
+}
