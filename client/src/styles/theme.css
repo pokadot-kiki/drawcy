@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Just Drawit — ธีมกลางตาม DESIGN.md
+   DRAW.CY — ธีมกลางตาม DESIGN.md
    "เกมพิกเซลสดใส" พื้นเหลืองแสงพุ่ง แผงสีครีม ขอบดำหนา เงาแข็ง ไม่มีมุมโค้ง
    กติกา: ห้ามใส่รหัสสีตรงๆ ในคอมโพเนนต์ ให้ใช้ตัวแปรในไฟล์นี้เท่านั้น
    ========================================================================== */
@@ -107,7 +107,7 @@ input {
   display: grid;
   gap: 10px; /* Press Start 2P ตัวสูง เพิ่มช่องว่างระหว่างสองบรรทัดไม่ให้ขอบเงาชนกัน */
   justify-items: center;
-  /* หัวข้อ "JUST DRAW IT" ใช้ฟอนต์พิกเซล Press Start 2P (เฉพาะโลโก้ ที่อื่นใช้ฟอนต์เดิม)
+  /* หัวข้อ "DRAW.CY" ใช้ฟอนต์พิกเซล Press Start 2P (เฉพาะโลโก้ ที่อื่นใช้ฟอนต์เดิม)
      ฟอนต์นี้ตัวกว้างมาก จึงลดขนาดและช่องไฟลง ไม่ให้ "DRAW IT" (7 ตัว) ล้นจอมือถือ */
   font-family: "Press Start 2P", var(--font-pixel);
   font-size: clamp(18px, 6.2vw, 46px);
@@ -2314,13 +2314,17 @@ select[class] {
 
 
 /* ============================ โหมดทีม (ส่วนที่ 2) ============================
-   ทีม A = แดง · ทีม B = ฟ้า  ทุกที่ที่ใช้สีบอกทีม มีตัวอักษร "ทีม A/B" กำกับด้วยเสมอ (ไม่พึ่งสีอย่างเดียว) */
+   ทีม A = แดง · B = ฟ้า · C = เขียว · D = เหลืองเข้ม  ทุกที่ที่ใช้สีบอกทีม มีตัวอักษร "ทีม A/B" กำกับด้วยเสมอ (ไม่พึ่งสีอย่างเดียว) */
 
 :root {
   --team-a: #d9363e;
   --team-a-soft: #fde3e1;
   --team-b: #1e6fe8;
   --team-b-soft: #dce9fc;
+  --team-c: #1b8a4b;
+  --team-c-soft: #dcf3e4;
+  --team-d: #b8750a;
+  --team-d-soft: #fdecc8;
 }
 
 /* ห้องรอ: สองคอลัมน์ข้างกัน (มือถือเรียงลง) */
@@ -3475,7 +3479,7 @@ select[class] {
 }
 
 .setup__opts {
-  gap: 18px;
+  gap: 12px; /* เดิม 18px — เพิ่มแถว "จำนวนผู้เล่น" แล้วต้องย่อช่องไฟให้หน้านี้ยังไม่ต้องเลื่อนที่ 1440×900 */
 }
 
 .setup__title {
@@ -3512,7 +3516,7 @@ select[class] {
 .setup__opts .seg {
   flex: 1;
   min-width: 0;
-  height: 56px;
+  height: 46px; /* เดิม 56px (ยังสูงกว่ากฎปุ่ม ≥44px) */
   padding: 0;
   font-size: 22px;
   box-shadow: var(--shadow-xs);
@@ -4604,3 +4608,29 @@ select[class] {
     order: 6;
   }
 }
+
+/* ===== ทีม C / D (หัวห้องเลือก 3–4 ทีม) — หน้าตาเหมือนทีม A/B เปลี่ยนแค่สี ===== */
+.team-col--C { background: var(--team-c-soft); border-color: var(--team-c); }
+.team-col--D { background: var(--team-d-soft); border-color: var(--team-d); }
+.team-col--C .team-col__title { color: var(--team-c); }
+.team-col--D .team-col__title { color: var(--team-d); }
+.team-vs__chip--C { background: var(--team-c-soft); border-color: var(--team-c); }
+.team-vs__chip--D { background: var(--team-d-soft); border-color: var(--team-d); }
+.score-team--C .score-team__head { background: var(--team-c-soft); border-color: var(--team-c); color: var(--team-c); }
+.score-team--D .score-team__head { background: var(--team-d-soft); border-color: var(--team-d); color: var(--team-d); }
+.team-winner--C { background: var(--team-c-soft); border-color: var(--team-c); }
+.team-winner--D { background: var(--team-d-soft); border-color: var(--team-d); }
+.team-me--C, .team-me-banner--C { background: var(--team-c); }
+.team-me--D, .team-me-banner--D { background: var(--team-d); }
+
+/* ห้องรอ: 3 ทีม = สามคอลัมน์ · 4 ทีม = 2×2 · มือถือเรียงลง */
+.team-cols--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.team-cols--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 620px) {
+  .team-cols--3,
+  .team-cols--4 { grid-template-columns: minmax(0, 1fr); }
+}
+
+.setup__hint { margin: 4px 2px 0; font-size: 12px; line-height: 1.3; color: var(--muted); }
+
+.name-owner-note { display: block; margin: 4px 0 10px; color: var(--muted); font-size: 12px; line-height: 1.35; }

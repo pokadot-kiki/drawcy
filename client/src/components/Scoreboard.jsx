@@ -36,7 +36,7 @@ export default function Scoreboard({
   if (teamScores) {
     return (
       <div className="score-teams">
-        {["A", "B"].map((t) => (
+        {Object.keys(teamScores).map((t) => (
           <section className={`score-team score-team--${t}`} key={t} aria-label={`ทีม ${t}`}>
             <h3 className="score-team__head">
               <span>

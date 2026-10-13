@@ -361,3 +361,20 @@ body,
     --r-card: 16px;
   }
 }
+
+/* ---- จอคอม: ขยายผู้เล่นกับแชท/เครื่องมือให้รับพื้นที่จอได้สมดุล ---- */
+@media (min-width: 1001px) {
+  .game:not(.game--solo) {
+    width: 100%;
+    max-width: none;
+    grid-template-columns: clamp(250px, 19vw, 360px) minmax(320px, var(--board-w)) clamp(300px, 23vw, 420px);
+    column-gap: 14px;
+  }
+}
+
+@media (min-width: 1001px) and (max-width: 1400px) {
+  .game:not(.game--solo) {
+    --board-w: max(320px, min(calc((100dvh - 402px) * 4 / 3), calc(100vw - 650px)));
+    grid-template-columns: 260px minmax(320px, var(--board-w)) 320px;
+  }
+}

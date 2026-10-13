@@ -2121,7 +2121,7 @@ async function main() {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const last = (P, name) => P.dump().filter((e) => e.name === name).at(-1)?.args[0];
     // ค่าเริ่มต้นของตัวเลือกห้องที่เพิ่มทีหลัง (ข้อ 32 เทสตัวเลือกพวกนี้โดยตรง)
-    const NEW_DEFAULTS = { difficulty: "easy", visibility: "private", challenges: ["none", "colour_fix", "dont_lift_pen"] };
+    const NEW_DEFAULTS = { difficulty: "easy", visibility: "private", maxPlayers: 8, teams: 2, challenges: ["none", "colour_fix", "dont_lift_pen"] };
     const socks = [];
     const make = async (data) => {
       const P = track(await connect()); socks.push(P);
@@ -2596,7 +2596,7 @@ async function main() {
       await wait(150);
       const hid = made.playerId;
       check("create_room รับ difficulty/visibility/challenge และเก็บไว้กับห้อง", last(H, "room_update").settings,
-        { mode: "classic", rounds: 1, drawTime: 30, difficulty: "hard", visibility: "public", challenges: ["none"] });
+        { mode: "classic", rounds: 1, drawTime: 30, difficulty: "hard", visibility: "public", maxPlayers: 8, teams: 2, challenges: ["none"] });
       checkOk("playerId ไม่ใช่ socket.id และเป็นรหัส 20 ตัว (แปลงจากกุญแจ)", hid !== H.socket.id && /^[0-9a-f]{20}$/.test(hid));
       checkOk("กุญแจลับไม่อยู่ใน event ใดๆ ที่ส่งกลับมา", !JSON.stringify(H.dump()).includes(KEY_H));
       check("ผู้เล่นมีช่อง connected: true", last(H, "room_update").players[0].connected, true);
@@ -2604,7 +2604,7 @@ async function main() {
       H.socket.emit("update_settings", { difficulty: "banana", visibility: "secret", challenge: "yes" });
       await wait(150);
       check("ค่าตัวเลือกที่ไม่อนุญาตถูกเมิน", last(H, "room_update").settings,
-        { mode: "classic", rounds: 1, drawTime: 30, difficulty: "hard", visibility: "public", challenges: ["none"] });
+        { mode: "classic", rounds: 1, drawTime: 30, difficulty: "hard", visibility: "public", maxPlayers: 8, teams: 2, challenges: ["none"] });
 
       // ---------- รายการห้อง Public ----------
       const P2 = await connectAs("test-key-private-0123456789");
@@ -2891,8 +2891,278 @@ async function main() {
     K.socket.disconnect();
   });
 
-  // ปิดทุก socket เพื่อให้โปรเซสจบได้
-  for (const rec of [A, B, C, ...others]) rec.socket.disconnect();
+  // ══════════════════════════════════════════════════════════════════
+  // ข้อ 36 — เลือกจำนวนผู้เล่น (settings.maxPlayers) + จัดทีมให้สมดุล (balance_teams · TEAM_FULL · TEAMS_UNBALANCED)
+  // ══════════════════════════════════════════════════════════════════
+  await runPart("36. maxPlayers (ห้องเต็มตามที่เลือก) · โหมดทีมเลขคู่ · TEAM_FULL · balance_teams · TEAMS_UNBALANCED", async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const last = (P, name) => P.dump().filter((e) => e.name === name).at(-1)?.args[0];
+    const { computeBalancedTeams } = require("../teams");
+    const socks = [];
+    const mk = async () => { const P = track(await connect()); socks.push(P); return P; };
+    const join = async (code, name) => { const P = await mk(); const r = await emitAck(P.socket, "join_room", { code, name, avatar: 0 }); return { P, r }; };
+
+    // ---- ฟังก์ชันจัดทีมล้วน ๆ ----
+    const mkPlayers = (scores) => scores.map((score, i) => ({ id: "p" + i, score }));
+    const tally = (players, map) => {
+      const t = { A: { n: 0, sum: 0 }, B: { n: 0, sum: 0 } };
+      for (const p of players) { t[map.get(p.id)].n++; t[map.get(p.id)].sum += p.score; }
+      return t;
+    };
+    let allOk = true;
+    for (let n = 2; n <= 8; n++) {
+      for (let run = 0; run < 20; run++) {
+        const ps = mkPlayers(Array.from({ length: n }, () => Math.floor(Math.random() * 1000)));
+        const t = tally(ps, computeBalancedTeams(ps));
+        if (Math.abs(t.A.n - t.B.n) > 1) allOk = false;
+      }
+    }
+    checkOk("computeBalancedTeams: 2–8 คน สุ่มคะแนน 20 รอบต่อขนาด จำนวนสองทีมต่างกันไม่เกิน 1 ทุกครั้ง", allOk);
+    const sc = mkPlayers([900, 800, 700, 600, 100, 50]);
+    let worst = 0;
+    for (let run = 0; run < 30; run++) {
+      const t = tally(sc, computeBalancedTeams(sc));
+      worst = Math.max(worst, Math.abs(t.A.sum - t.B.sum), Math.abs(t.A.n - t.B.n) * 1e6);
+    }
+    checkOk(`computeBalancedTeams: คะแนน [900 800 700 600 100 50] → 3 ต่อ 3 และคะแนนรวมต่างกันไม่เกิน 100 (ได้ ${worst})`, worst <= 100);
+    const zero = mkPlayers([0, 0, 0, 0, 0, 0]);
+    const seen = new Set();
+    for (let run = 0; run < 30; run++) {
+      const m = computeBalancedTeams(zero);
+      seen.add(zero.map((p) => m.get(p.id)).join(""));
+    }
+    checkOk(`computeBalancedTeams: ทุกคน 0 คะแนน → แบ่งแล้วได้หลายแบบ (สุ่ม · ได้ ${seen.size} แบบจาก 30 ครั้ง)`, seen.size >= 2);
+    const odd = computeBalancedTeams(mkPlayers([5, 4, 3, 2, 1]));
+    checkOk("computeBalancedTeams: 5 คน → 3 ต่อ 2", [...odd.values()].filter((t) => t === "A").length + [...odd.values()].filter((t) => t === "B").length === 5 &&
+      Math.abs([...odd.values()].filter((t) => t === "A").length - [...odd.values()].filter((t) => t === "B").length) === 1);
+
+    // ---- maxPlayers: classic ----
+    const H = await mk();
+    const made = await emitAck(H.socket, "create_room", { name: "MaxH", avatar: 0, maxPlayers: 4 });
+    await wait(150);
+    check("create_room maxPlayers: 4 → settings.maxPlayers = 4", last(H, "room_update").settings.maxPlayers, 4);
+    const j1 = await join(made.code, "Max1"), j2 = await join(made.code, "Max2"), j3 = await join(made.code, "Max3");
+    checkOk("ห้อง maxPlayers 4: คนที่ 2–4 เข้าได้", j1.r?.ok && j2.r?.ok && j3.r?.ok);
+    const j4 = await join(made.code, "Max4");
+    check("ห้อง maxPlayers 4: คนที่ 5 → ROOM_FULL", j4.r?.error, "ROOM_FULL");
+
+    // ---- ตั้งค่าไม่ผ่านกติกา: เมินเงียบ ๆ ----
+    for (const bad of [9, 1, 0, -3, 4.5, "abc", null, {}]) H.socket.emit("update_settings", { maxPlayers: bad });
+    await wait(200);
+    check("maxPlayers นอก 2–8 / ไม่ใช่จำนวนเต็ม ถูกเมิน (คงค่าเดิม 4)", last(H, "room_update").settings.maxPlayers, 4);
+    H.socket.emit("update_settings", { maxPlayers: 2 });
+    await wait(200);
+    check("ตั้ง maxPlayers ต่ำกว่าคนที่อยู่ในห้อง (4 คน) ไม่ได้ → ยัง 4", last(H, "room_update").settings.maxPlayers, 4);
+    j3.P.clear();
+    j3.P.socket.emit("update_settings", { maxPlayers: 8 });
+    const nh = await j3.P.wait("game_error", null, 1500).catch(() => null);
+    await wait(150);
+    check("คนที่ไม่ใช่หัวห้องแก้ maxPlayers ไม่ได้", [nh?.code, last(H, "room_update").settings.maxPlayers], ["NOT_HOST", 4]);
+    H.socket.emit("update_settings", { maxPlayers: 6 });
+    await wait(200);
+    check("หัวห้องเพิ่ม maxPlayers เป็น 6 → คนที่ 5 เข้าได้", [last(H, "room_update").settings.maxPlayers, (await join(made.code, "Max5")).r?.ok], [6, true]);
+
+    // ---- GET /api/rooms ส่ง maxPlayers ของห้อง ----
+    H.socket.emit("update_settings", { visibility: "public" });
+    await wait(200);
+    const list = await (await fetch(`${URL}/api/rooms`)).json();
+    const mine = list.rooms.find((r) => r.code === made.code);
+    check("GET /api/rooms: ห้องนี้ส่ง players=5 maxPlayers=6", [mine?.players, mine?.maxPlayers], [5, 6]);
+    const j6 = await join(made.code, "Max6");
+    check("ห้องเต็ม 6/6 แล้วหายจากรายการ Public", [j6.r?.ok, (await (await fetch(`${URL}/api/rooms`)).json()).rooms.some((r) => r.code === made.code)], [true, false]);
+
+    // ---- โหมดทีม: maxPlayers เป็นเลขอะไรก็ได้ 2–8 (ไม่บังคับเลขคู่แล้ว · ทีมต่างกันได้ไม่เกิน 1 คน) ----
+    const T = await mk();
+    const tm = await emitAck(T.socket, "create_room", { name: "TeamH", avatar: 0, mode: "team", maxPlayers: 3 });
+    await wait(150);
+    check("โหมดทีม maxPlayers 3 → คงเป็น 3 (ไม่บังคับเลขคู่)", last(T, "room_update").settings.maxPlayers, 3);
+    T.socket.emit("update_settings", { maxPlayers: 5 });
+    await wait(150);
+    check("โหมดทีมตั้ง 5 → คงเป็น 5", last(T, "room_update").settings.maxPlayers, 5);
+    const C5 = await mk();
+    await emitAck(C5.socket, "create_room", { name: "ClassicH", avatar: 0, maxPlayers: 5 });
+    C5.socket.emit("update_settings", { mode: "team" });
+    await wait(200);
+    check("สลับ classic(5 คน) → ทีม คงเป็น 5", [last(C5, "room_update").settings.mode, last(C5, "room_update").settings.maxPlayers], ["team", 5]);
+
+    // ---- TEAM_FULL · balance_teams · TEAMS_UNBALANCED ----
+    T.socket.emit("update_settings", { maxPlayers: 6 });
+    const t1 = await join(tm.code, "Tm1"), t2 = await join(tm.code, "Tm2"), t3 = await join(tm.code, "Tm3"), t4 = await join(tm.code, "Tm4"), t5 = await join(tm.code, "Tm5");
+    await wait(250);
+    const teamsOf = () => Object.fromEntries(["A", "B"].map((x) => [x, last(T, "room_update").players.filter((p) => p.team === x).length]));
+    check("คนเข้าห้องทีมถูกกระจาย 3 ต่อ 3 อัตโนมัติ", teamsOf(), { A: 3, B: 3 });
+    const mover = [t1, t2, t3, t4, t5].find((x) => last(T, "room_update").players.find((p) => p.id === x.r.playerId)?.team === "B");
+    mover.P.clear();
+    mover.P.socket.emit("set_team", { team: "A" });
+    await wait(250);
+    check("ทีม A มีโควตา 3 (6 คน หารสองทีม) · เต็มแล้ว → ย้ายเข้าไม่ได้ ได้ TEAM_FULL", [mover.P.dump().some((e) => e.name === "game_error" && e.args[0].code === "TEAM_FULL"), teamsOf()], [true, { A: 3, B: 3 }]);
+
+    // ย้ายออกจาก A ไป B ไม่ได้ถ้าเต็ม · ทำให้เบี้ยวด้วยการให้ A คนหนึ่งออกจากห้อง แล้วให้ B 3 คน + A 2 คน → ไม่เบี้ยวเกิน 1
+    // ทำให้เบี้ยวเกิน 1: ให้ A สองคนออก → A=1 B=3 (เริ่มไม่ได้อยู่แล้วเพราะ A<2) แล้วให้คนใหม่เข้า (เข้า A) → A=3? ใช้วิธีง่ายกว่า: ห้อง 8 คน
+    const U = await mk();
+    const um = await emitAck(U.socket, "create_room", { name: "UnbH", avatar: 0, mode: "team" });
+    const us = [];
+    for (let i = 1; i <= 5; i++) us.push(await join(um.code, "Unb" + i));
+    await wait(250);
+    const utTeams = () => Object.fromEntries(["A", "B"].map((x) => [x, last(U, "room_update").players.filter((p) => p.team === x).length]));
+    check("ห้องทีม 6 คน (max 8) → 3 ต่อ 3", utTeams(), { A: 3, B: 3 });
+    const mv = us.find((x) => last(U, "room_update").players.find((p) => p.id === x.r.playerId)?.team === "B");
+    mv.P.socket.emit("set_team", { team: "A" }); // A=4 (cap 4) B=2
+    await wait(250);
+    check("ย้ายมา A → 4 ต่อ 2", utTeams(), { A: 4, B: 2 });
+    U.clear();
+    U.socket.emit("start_game");
+    const ub = await U.wait("game_error", null, 1500).catch(() => null);
+    check("ทีม 4 ต่อ 2 → start_game ได้ TEAMS_UNBALANCED และไม่เริ่ม", [ub?.code, last(U, "room_update").status], ["TEAMS_UNBALANCED", "lobby"]);
+    check("ข้อความ TEAMS_UNBALANCED บอกจำนวนแต่ละทีม", /4/.test(ub?.message || "") && /2/.test(ub?.message || ""), true);
+    // ไม่ใช่หัวห้องจัดทีมไม่ได้
+    mv.P.clear();
+    mv.P.socket.emit("balance_teams");
+    const nb = await mv.P.wait("game_error", null, 1500).catch(() => null);
+    await wait(150);
+    check("คนที่ไม่ใช่หัวห้องส่ง balance_teams → NOT_HOST และทีมไม่เปลี่ยน", [nb?.code, utTeams()], ["NOT_HOST", { A: 4, B: 2 }]);
+    U.socket.emit("balance_teams");
+    await wait(300);
+    check("หัวห้อง balance_teams → 3 ต่อ 3", utTeams(), { A: 3, B: 3 });
+    // ทุกคนยังอยู่ครบ ไม่มีใครหาย/ซ้ำ
+    check("จัดทีมใหม่แล้วผู้เล่นครบ 6 คนทุกคนมีทีม", last(U, "room_update").players.every((p) => p.team === "A" || p.team === "B") && last(U, "room_update").players.length === 6, true);
+    // classic ส่ง balance_teams = ไม่ทำอะไร
+    H.clear();
+    H.socket.emit("balance_teams");
+    check("ห้อง classic ส่ง balance_teams → ไม่มี room_update", (await H.quiet("room_update", 400)).length, 0);
+    // จัดใหม่หลายครั้งได้ผลต่างกัน (ทุกคน 0 คะแนน → สุ่ม)
+    const splits = new Set();
+    for (let i = 0; i < 12; i++) {
+      U.socket.emit("balance_teams");
+      await wait(120);
+      splits.add(last(U, "room_update").players.map((p) => p.name + p.team).sort().join(","));
+    }
+    checkOk(`กดจัดทีมใหม่ซ้ำ ๆ ได้การแบ่งหลายแบบ (ได้ ${splits.size} แบบจาก 12 ครั้ง)`, splits.size >= 2);
+    // เริ่มเกมได้เมื่อสมดุล
+    U.clear();
+    U.socket.emit("start_game");
+    check("ทีมสมดุลแล้ว start_game เริ่มเกมได้", (await U.wait("game_started", null, 2000).catch(() => null))?.mode, "team");
+
+    for (const P of socks) P.socket.disconnect();
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // ข้อ 37 — เลือกจำนวนทีม 2 / 3 / 4 (settings.teams) · ทุกทีมต่างกันไม่เกิน 1 คน
+  // ══════════════════════════════════════════════════════════════════
+  await runPart("37. จำนวนทีม 2/3/4 · 5 คนเล่น 2 ทีมได้ (3+2) · ต่างกันเกิน 1 คนเริ่มไม่ได้", async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const last = (P, name) => P.dump().filter((e) => e.name === name).at(-1)?.args[0];
+    const { computeBalancedTeams } = require("../teams");
+    const socks = [];
+    const mk = async () => { const P = track(await connect()); socks.push(P); return P; };
+    const join = async (code, name) => { const P = await mk(); const r = await emitAck(P.socket, "join_room", { code, name, avatar: 0 }); return { P, r }; };
+
+    // ---- ฟังก์ชันจัดทีมล้วน ๆ แบบ N ทีม ----
+    let allOk = true, onlyIds = true;
+    for (const teams of [2, 3, 4]) {
+      for (let n = teams; n <= 8; n++) {
+        for (let run = 0; run < 15; run++) {
+          const ps = Array.from({ length: n }, (_, i) => ({ id: "p" + i, score: Math.floor(Math.random() * 1000) }));
+          const m = computeBalancedTeams(ps, { teams });
+          const cnt = {};
+          for (const t of m.values()) cnt[t] = (cnt[t] || 0) + 1;
+          const ids = ["A", "B", "C", "D"].slice(0, teams);
+          const ns = ids.map((t) => cnt[t] || 0);
+          if (Math.max(...ns) - Math.min(...ns) > 1) allOk = false;
+          if (m.size !== n || [...m.values()].some((t) => !ids.includes(t))) onlyIds = false;
+        }
+      }
+    }
+    checkOk("computeBalancedTeams: 2/3/4 ทีม × 1–8 คน ทุกทีมต่างกันไม่เกิน 1 คนทุกครั้ง", allOk);
+    checkOk("computeBalancedTeams: ทุกคนได้ทีมและใช้เฉพาะชื่อทีมตามจำนวนทีม", onlyIds);
+    const five = computeBalancedTeams(Array.from({ length: 5 }, (_, i) => ({ id: "q" + i, score: 0 })), { teams: 2 });
+    check("5 คน 2 ทีม → 3+2", [...five.values()].filter((t) => t === "A").length + [...five.values()].filter((t) => t === "B").length, 5);
+    const seven = computeBalancedTeams(Array.from({ length: 7 }, (_, i) => ({ id: "r" + i, score: 0 })), { teams: 3, shuffle: false });
+    check("7 คน 3 ทีม (ไม่สุ่ม) → A3 B2 C2", ["A", "B", "C"].map((t) => [...seven.values()].filter((x) => x === t).length), [3, 2, 2]);
+
+    // ---- ตั้งจำนวนทีม ----
+    const H = await mk();
+    const made = await emitAck(H.socket, "create_room", { name: "NT", avatar: 0, mode: "team" });
+    await wait(150);
+    check("ห้องทีมใหม่: settings.teams ค่าเริ่มต้น 2", last(H, "room_update").settings.teams, 2);
+    for (const bad of [1, 5, 0, 2.5, "x", null, {}]) H.socket.emit("update_settings", { teams: bad });
+    await wait(200);
+    check("settings.teams นอก 2/3/4 ถูกเมิน (คงเดิม 2)", last(H, "room_update").settings.teams, 2);
+    const created3 = await mk();
+    const c3 = await emitAck(created3.socket, "create_room", { name: "T3", avatar: 0, mode: "team", teams: 3 });
+    await wait(150);
+    check("create_room mode team + teams 3 → settings.teams = 3", last(created3, "room_update").settings.teams, 3);
+    const nonHost = await join(made.code, "NT1");
+    nonHost.P.socket.emit("update_settings", { teams: 4 });
+    await wait(200);
+    check("คนที่ไม่ใช่หัวห้องเปลี่ยนจำนวนทีมไม่ได้", last(H, "room_update").settings.teams, 2);
+
+    // ---- 5 คน 2 ทีม = 3+2 เริ่มได้ ----
+    const g = [];
+    for (const n of ["NT2", "NT3", "NT4"]) g.push(await join(made.code, n));
+    await wait(250);
+    const cnt = (P, ids) => Object.fromEntries(ids.map((x) => [x, last(P, "room_update").players.filter((p) => p.team === x).length]));
+    check("5 คน 2 ทีม → A3 B2", cnt(H, ["A", "B"]), { A: 3, B: 2 });
+    check("teamScores มีเฉพาะ A, B", Object.keys(last(H, "room_update").teamScores), ["A", "B"]);
+    H.clear();
+    H.socket.emit("start_game");
+    check("5 คน 3+2 → เริ่มเกมได้", (await H.wait("game_started", null, 2000).catch(() => null))?.mode, "team");
+    for (const P of socks) P.socket.disconnect();
+    socks.length = 0;
+
+    // ---- 2 vs 4 ไม่ได้ · 3 vs 3/2 vs 3 ได้ ----
+    const U = await mk();
+    const um = await emitAck(U.socket, "create_room", { name: "UB", avatar: 0, mode: "team" });
+    const us = [];
+    for (let i = 1; i <= 5; i++) us.push(await join(um.code, "UB" + i));
+    await wait(250);
+    check("6 คน 2 ทีม → 3 ต่อ 3", cnt(U, ["A", "B"]), { A: 3, B: 3 });
+    const bs = us.filter((x) => last(U, "room_update").players.find((p) => p.id === x.r.playerId)?.team === "B");
+    bs[0].P.socket.emit("set_team", { team: "A" });
+    await wait(200);
+    check("ย้ายหนึ่งคน → 4 ต่อ 2", cnt(U, ["A", "B"]), { A: 4, B: 2 });
+    U.clear();
+    U.socket.emit("start_game");
+    const e1 = await U.wait("game_error", null, 1500).catch(() => null);
+    check("ต่างกัน 2 คน (4 vs 2) → TEAMS_UNBALANCED", e1?.code, "TEAMS_UNBALANCED");
+    bs[1].P.clear();
+    bs[1].P.socket.emit("set_team", { team: "A" });
+    const e2 = await bs[1].P.wait("game_error", null, 1500).catch(() => null);
+    check("ทีม A เต็มโควตา 4 (8 คน หาร 2 ทีม) → ย้ายเพิ่มไม่ได้ TEAM_FULL", [e2?.code, cnt(U, ["A", "B"])], ["TEAM_FULL", { A: 4, B: 2 }]);
+    U.socket.emit("set_team", { team: "C" });
+    await wait(150);
+    check("set_team ทีม C ในห้อง 2 ทีม → เมิน", last(U, "room_update").players[0].team, "A");
+    U.socket.emit("balance_teams");
+    await wait(250);
+    check("กดจัดทีม → 3 ต่อ 3 แล้วเริ่มได้", cnt(U, ["A", "B"]), { A: 3, B: 3 });
+    for (const P of socks) P.socket.disconnect();
+    socks.length = 0;
+
+    // ---- 3 ทีม ----
+    const R = await mk();
+    const rm = await emitAck(R.socket, "create_room", { name: "R1", avatar: 0, mode: "team", teams: 3, rounds: 1, drawTime: 30 });
+    const rs = [];
+    for (let i = 2; i <= 7; i++) rs.push(await join(rm.code, "R" + i));
+    await wait(300);
+    check("7 คน 3 ทีม → ทีมละ 3/2/2 (คนไม่เกินต่างกัน 1)", Object.values(cnt(R, ["A", "B", "C"])).sort(), [2, 2, 3]);
+    check("teamScores มี A B C", Object.keys(last(R, "room_update").teamScores), ["A", "B", "C"]);
+    R.socket.emit("update_settings", { teams: 4 });
+    await wait(250);
+    check("เปลี่ยนเป็น 4 ทีม → จัดคนใหม่ 7 คน = 2/2/2/1", Object.values(cnt(R, ["A", "B", "C", "D"])).sort(), [1, 2, 2, 2]);
+    R.clear();
+    R.socket.emit("start_game");
+    const e3 = await R.wait("game_error", null, 1500).catch(() => null);
+    check("4 ทีมต้องมี 8 คน (ทีมละ 2) → 7 คนได้ NOT_ENOUGH_PLAYERS", e3?.code, "NOT_ENOUGH_PLAYERS");
+    R.socket.emit("update_settings", { teams: 3 });
+    await wait(250);
+    R.clear();
+    R.socket.emit("start_game");
+    await R.wait("game_started", null, 2000);
+    const rsA = await R.wait("round_start", (e) => e.drawerIds && Object.keys(e.drawerIds).length === 3, 20000).catch(() => null);
+    checkOk("3 ทีม: round_start.drawerIds มี A B C และ solvedTeams เป็นอาร์เรย์", rsA && ["A", "B", "C"].every((t) => t in rsA.drawerIds) && Array.isArray(rsA.solvedTeams));
+    for (const P of socks) P.socket.disconnect();
+  });
+
   await runPart("40. เจ้าของชื่อ Leaderboard กันสวมรอยก่อนเข้าห้องและ Solo", async () => {
     const lb = require("../leaderboard");
     const keyA = "a".repeat(32), keyB = "b".repeat(32), keyC = "c".repeat(32);
@@ -2933,6 +3203,7 @@ async function main() {
     check("ข้อมูลคะแนนเก่าที่ไม่มี ownerHash ยังใช้ชื่อได้", lb.canUseName([{ name: "Legacy", score: 10, playedAt: "2026-01-01 00:00" }], "legacy", keyB), true);
     for (const rec of [ownerHost, other, guest]) rec.socket.disconnect();
   });
+
   await runPart("41. ตรวจชื่อไม่สุภาพทุกทาง และยุบตัวอักษรหลบเลี่ยง", async () => {
     const { isNameAllowed } = require("../clean");
     const passNames = ["peacock", "Cocktail", "Scunthorpe", "ฟักทอง", "สาธิต"];
@@ -2962,6 +3233,7 @@ async function main() {
     checkOk("ข้อความ error ไม่สะท้อนคำที่ถูกปฏิเสธ", solo && !/sh!t/i.test(solo.message));
     host.socket.disconnect(); guest.socket.disconnect();
   });
+
   await runPart("42. อวตารทั้ง 12 แบบผ่านตั้งแต่สร้างห้อง และเลขผิดใช้ตัวแรก", async () => {
     const received = [];
     for (let avatar = 0; avatar < 12; avatar++) {
@@ -2978,8 +3250,10 @@ async function main() {
     check("เลขอวตารเกินขอบเขตกลับไปตัวแรก", room.players[0].avatar, 0);
     invalid.socket.disconnect();
   });
-}
 
+  // ปิดทุก socket เพื่อให้โปรเซสจบได้
+  for (const rec of [A, B, C, ...others]) rec.socket.disconnect();
+}
 
 // กันเทสค้าง: ถ้าเกิน 300 วิให้หยุด (ข้อ 29 เพิ่มราว 20 วิ) (ไม่หน่วงไม่ให้โปรเซสปิดตัว)
 // เดิมตั้งไว้ 90 วิ ตอนที่ชุดเทสทั้งชุดใช้ราว 35 วิ — ข้อ 5 เพิ่มการสร้างห้องจริง 30 ห้อง

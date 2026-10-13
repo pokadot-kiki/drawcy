@@ -6,7 +6,7 @@ import { AvatarArt, Icon } from "../components/Icons";
 import { useEnterRoom } from "../hooks/useEnterRoom";
 import OptionRow from "../components/OptionRow";
 import AvatarPicker from "../components/AvatarPicker";
-import { DIFFICULTY_CHOICES, VISIBILITY_CHOICES } from "../roomOptions";
+import { DIFFICULTY_CHOICES, VISIBILITY_CHOICES, maxPlayersChoices, TEAM_COUNT_CHOICES, minPlayersForTeams } from "../roomOptions";
 
 // หน้า SET UP (กดสร้างห้องแล้วมาหน้านี้): ซ้าย ตั้งค่ารอบ/เวลา · ขวา การ์ดโหมดใหญ่สองใบ · ล่าง ปุ่มสร้างห้อง
 // ค่าที่เลือกส่งไปกับ create_room (events.md §1) server เช็คซ้ำ ค่าไม่ถูกจะใช้ค่าเริ่มต้น
@@ -19,6 +19,8 @@ export default function SetUp({ connected, profile, onProfile, onBack, onEntered
   const [drawTime, setDrawTime] = useState(60);
   const [difficulty, setDifficulty] = useState("easy"); // ชุดคำ (ไม่เกี่ยวกับเวลา)
   const [visibility, setVisibility] = useState("private");
+  const [maxPlayers, setMaxPlayers] = useState(8); // กี่คนต่อห้อง (เฉพาะแข่งเดี่ยว)
+  const [teams, setTeams] = useState(2); // จำนวนทีมในโหมดทีม 2/3/4
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   // Challenge เลือกเปิด/ปิดทีละใบในห้องรอ (การ์ด 4 ใบ) ไม่ตั้งที่นี่แล้ว — ห้องเริ่มด้วยชุดเริ่มต้นของ server
   const { busy, enter } = useEnterRoom({ connected, onEntered, onError });
@@ -35,7 +37,7 @@ export default function SetUp({ connected, profile, onProfile, onBack, onEntered
     const who = name.trim() || randomName(); // กันกรณีชื่อว่าง
     enter(
       "create_room",
-      { name: who, avatar, mode, rounds, drawTime, difficulty, visibility },
+      { name: who, avatar, mode, rounds, drawTime, difficulty, visibility, ...(mode === "team" ? { teams } : { maxPlayers }) },
       { name: who, avatar }
     );
   }
@@ -51,6 +53,20 @@ export default function SetUp({ connected, profile, onProfile, onBack, onEntered
         <section className="panel setup__opts deco-host" aria-label="ตั้งค่าห้อง">
           <Critter name="cat" className="crit crit--top-left" />
           <h2 className="panel__title setup__title">ตั้งค่า</h2>
+          {/* แข่งเดี่ยว: เลือกจำนวนผู้เล่น · โหมดทีม: เลือกจำนวนทีม 2/3/4 (เล่นกี่คนก็ได้ ทีมต่างกันไม่เกิน 1 คน) · แข่งกับ AI ไม่ต้องมี */}
+          {!isAI && (
+            <div className="setup__opt">
+              <h3 className="setup__head">
+                <Icon name="users" size={22} /> {mode === "team" ? "จำนวนทีม" : "จำนวนผู้เล่น"}
+                {mode === "team" && <small>(ต้อง {minPlayersForTeams(teams)} คนขึ้นไป)</small>}
+              </h3>
+              {mode === "team" ? (
+                <OptionRow label="จำนวนทีม" choices={TEAM_COUNT_CHOICES} value={teams} onChange={setTeams} />
+              ) : (
+                <OptionRow label="จำนวนผู้เล่นสูงสุด" choices={maxPlayersChoices()} value={maxPlayers} onChange={setMaxPlayers} />
+              )}
+            </div>
+          )}
           <div className="setup__opt">
             <h3 className="setup__head">
               <Icon name="flag" size={22} /> จำนวนรอบ
@@ -109,6 +125,7 @@ export default function SetUp({ connected, profile, onProfile, onBack, onEntered
                 ? "Public: ห้องขึ้นในรายการหน้าแรก ใครก็กดเข้าได้ · Mini Challenge เปิด/ปิดได้ในห้องรอ"
                 : "Private: เข้าได้ด้วยรหัสห้องหรือลิงก์เชิญเท่านั้น · Mini Challenge เปิด/ปิดได้ในห้องรอ"}
           </p>
+          <small className="name-owner-note">ชื่อบน Leaderboard ผูกกับเบราว์เซอร์เครื่องนี้ · ล้างข้อมูลหรือเปลี่ยนเครื่องอาจใช้ชื่อเดิมไม่ได้</small>
           <p className="setup__who">
             <AvatarArt index={avatar} size={34} />
             <span>{name.trim() || "ยังไม่ได้ใส่ชื่อ"}</span>
@@ -157,8 +174,8 @@ export default function SetUp({ connected, profile, onProfile, onBack, onEntered
                 <AvatarArt index={5} size={40} />
               </span>
             </span>
-            <span className="mode-card__title">ทีม A vs B</span>
-            <span className="mode-card__desc">แบ่งสองทีม วาดคำเดียวกันพร้อมกัน ทีมไหนทายถูกก่อนได้โบนัส (ต้องมี 4 คนขึ้นไป)</span>
+            <span className="mode-card__title">โหมดทีม</span>
+            <span className="mode-card__desc">เลือก 2–4 ทีม ระบบแบ่งให้สมดุล วาดคำเดียวกันพร้อมกัน ทีมไหนทายถูกก่อนได้โบนัส</span>
           </button>
 
           <button

@@ -50,7 +50,7 @@ export function InfoModal({ onClose, teamMode = false }) {
 
       {teamMode && (
         <>
-          <h3 className="modal__subtitle">โหมดทีม A vs B</h3>
+          <h3 className="modal__subtitle">โหมดทีม</h3>
           <TeamRules />
         </>
       )}

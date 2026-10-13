@@ -208,8 +208,8 @@ export default function App() {
 
   return (
     <>
-      {/* ปุ่มเพลง/เสียงเอฟเฟกต์: หน้าเกม/Solo อยู่ในแถบบน (TopIcons) หน้าอื่นลอยมุมขวาบนของหน้า */}
-      {!showGame && route.screen !== "solo" && <AudioDock />}
+      {/* ปุ่มเพลง/เสียงเอฟเฟกต์: หน้าเกม/Solo/ห้องรอ อยู่ในแถบบนของหน้านั้นเอง หน้าอื่นลอยมุมขวาบนของหน้า */}
+      {!roomReady && route.screen !== "solo" && <AudioDock />}
       {route.screen === "lobby" && (
         <Lobby
           key={inviteCode ?? "home"} // ลิงก์เชิญเปลี่ยน = สร้างหน้าใหม่ให้กล่องเข้าห้องเปิดพร้อมรหัสนั้น

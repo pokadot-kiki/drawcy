@@ -20,19 +20,22 @@ export default function ChallengeCards({ enabled = DEFAULT_CHALLENGES, isHost })
     <div className="challenge-cards-wrap">
       <div className="challenge-cards-head">
         <span className="field__label">Mini Challenge</span>
-        <span className="challenge-count">{active} / {CHALLENGE_CARDS.length} ACTIVE</span>
+        <span className="wr-challenge-hint">สุ่มใช้ระหว่างวาด</span>
+        <span className="challenge-count">เปิด {active}/{CHALLENGE_CARDS.length}</span>
       </div>
       <div className="challenge-cards" role={isHost ? "group" : undefined} aria-label="เปิด/ปิด Mini Challenge">
         {CHALLENGE_CARDS.map((c) => {
           const on = enabled.includes(c.id);
           const lastOne = on && enabled.length <= 1; // ปิดไม่ได้เพราะเหลือใบเดียว
-          const cls = `chal-card${on ? " chal-card--on" : ""}${isHost ? " chal-card--host" : ""}`;
+          const cls = `chal-card wr-chal-card--${c.id}${on ? " chal-card--on" : ""}${isHost ? " chal-card--host" : ""}`;
+          const icon = c.id === "colour_fix" ? "◉" : c.id === "shapes_only" ? "◈" : "✎";
           const content = (
             <>
+              <span className="wr-chal-card__icon" aria-hidden="true">{icon}</span>
               <span className="chal-card__title">{c.title}</span>
               <span className="chal-card__desc">{c.desc}</span>
               <span className={`chal-card__badge chal-card__badge--${on ? "on" : "off"}`}>
-                {on ? "ENABLED" : "DISABLED"}
+                {on ? "เปิดอยู่ ✓" : "ปิดอยู่"}
               </span>
             </>
           );

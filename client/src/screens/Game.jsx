@@ -194,10 +194,10 @@ export default function Game({
           </span>
         </div>
 
-        {/* โหมดทีม: คะแนนทีม A vs B (ผลรวมสมาชิก จาก room.teamScores) ทีมเราขอบหนากว่า */}
+        {/* โหมดทีม: คะแนนทีม A–D (ผลรวมสมาชิก จาก room.teamScores) ทีมเราขอบหนากว่า */}
         {teamMode && (
           <div className="team-vs" aria-label="คะแนนทีม">
-            {["A", "B"].map((t, i) => (
+            {Object.keys(room.teamScores ?? { A: 0, B: 0 }).map((t, i) => (
               <span key={t} className="team-vs__item">
                 {i === 1 && <span className="team-vs__sep">vs</span>}
                 <span className={`team-vs__chip team-vs__chip--${t}${myTeam === t ? " team-vs__chip--mine" : ""}`}>

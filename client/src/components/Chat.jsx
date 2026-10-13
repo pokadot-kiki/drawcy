@@ -13,7 +13,18 @@ import { useEffect, useRef, useState } from "react";
  *
  * คนวาดพิมพ์ไม่ได้ระหว่างวาด server ตัดทิ้งอยู่แล้ว แต่ฝั่งเราปิดช่องไปเลยจะได้เข้าใจง่าย
  */
-export default function Chat({ messages = [], meId, disabled = false, onSend, focusKey = 0 }) {
+export default function Chat({
+  messages = [],
+  meId,
+  disabled = false,
+  onSend,
+  focusKey = 0,
+  autoFocus = true,
+  title = "คำตอบ",
+  emptyText = "พิมพ์ทายคำที่นี่",
+  placeholder = "ทายคำ...",
+  className = "panel panel--answers",
+}) {
   const [text, setText] = useState("");
   const listRef = useRef(null);
   const inputRef = useRef(null);
@@ -27,9 +38,9 @@ export default function Chat({ messages = [], meId, disabled = false, onSend, fo
   // ขึ้นตาใหม่ = เริ่มทายใหม่ ให้เคอร์เซอร์อยู่ที่ช่องพิมพ์เลย จะได้พิมพ์ได้ทันทีไม่ต้องกดก่อน
   // ข้ามตอนที่พิมพ์ไม่ได้ (เราเป็นคนวาด) ไม่งั้นจะไปแย่งโฟกัสทั้งที่พิมพ์ไม่ได้
   useEffect(() => {
-    if (!disabled) inputRef.current?.focus();
+    if (!disabled && autoFocus) inputRef.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusKey]);
+  }, [focusKey, autoFocus, disabled]);
 
   function handleSubmit(e) {
     e.preventDefault(); // กด Enter ในช่องนี้ = ส่ง (ฟอร์มจัดการให้เอง ไม่ต้องดักคีย์เอง)
@@ -42,11 +53,11 @@ export default function Chat({ messages = [], meId, disabled = false, onSend, fo
   const guesses = messages.filter((m) => !m.system);
 
   return (
-    <section className="panel panel--answers" aria-label="คำตอบ">
-      <h2 className="panel__title">คำตอบ</h2>
+    <section className={className} aria-label={title}>
+      <h2 className="panel__title">{title}</h2>
 
       <div className="chat__list" ref={listRef}>
-        {guesses.length === 0 && <p className="chat__empty">พิมพ์ทายคำที่นี่</p>}
+        {guesses.length === 0 && <p className="chat__empty">{emptyText}</p>}
         {guesses.map((m, i) => {
           const classes = ["chat__row"];
           if (m.correct) classes.push("chat__row--correct");
@@ -67,8 +78,8 @@ export default function Chat({ messages = [], meId, disabled = false, onSend, fo
           value={text}
           maxLength={100}
           disabled={disabled}
-          placeholder={disabled ? "คุณกำลังวาดอยู่" : "ทายคำ..."}
-          aria-label="ช่องทายคำ"
+          placeholder={disabled ? "คุณกำลังวาดอยู่" : placeholder}
+          aria-label={title === "คำตอบ" ? "ช่องทายคำ" : "ช่องแชทรอห้อง"}
           onChange={(e) => setText(e.target.value)}
         />
         <button className="btn btn--primary" type="submit" disabled={disabled || !text.trim()}>

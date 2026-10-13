@@ -9,6 +9,7 @@ const path = require("path");
 const { Server } = require("socket.io");
 const { cleanName, isNameAllowed } = require("./clean");
 const { hashOwnerKey } = require("./name-ownership");
+const { TEAM_IDS, computeBalancedTeams } = require("./teams"); // จัดทีมให้สมดุล (ฟังก์ชันล้วน แยกไฟล์ให้ทดสอบตรง ๆ)
 const leaderboard = require("./leaderboard");
 const ai = require("./ai");
 const aiDrawings = require("./ai-drawings");
@@ -122,12 +123,12 @@ app.get("/api/leaderboard", (req, res) => {
 app.get("/api/rooms", (req, res) => {
   const list = [];
   for (const room of rooms.values()) {
-    if (room.settings.visibility !== "public" || room.players.length >= MAX_PLAYERS) continue;
+    if (room.settings.visibility !== "public" || room.players.length >= roomMax(room)) continue;
     list.push({
       code: room.code,
       host: room.players.find((p) => p.id === room.hostId)?.name ?? "",
       players: room.players.length,
-      maxPlayers: MAX_PLAYERS,
+      maxPlayers: roomMax(room),
       status: room.status,
       mode: room.settings.mode,
       difficulty: room.settings.difficulty,
@@ -151,7 +152,7 @@ if (HAS_CLIENT) {
       .status(503)
       .type("html")
       .send(
-        "<meta charset=utf-8><title>Just Drawit</title><body style='font-family:sans-serif;padding:2em'>" +
+        "<meta charset=utf-8><title>DRAW.CY</title><body style='font-family:sans-serif;padding:2em'>" +
           "<h2>ยังไม่ได้ build หน้าเว็บของเกม</h2><p>รัน <code>npm run setup</code> (หรือ <code>cd client &amp;&amp; npm run build</code>) แล้วเปิด server ใหม่</p></body>",
       ),
   );
@@ -168,7 +169,10 @@ function lanAddresses() {
 
 // ---------- ที่เก็บข้อมูลห้อง ----------
 const rooms = new Map(); // key = รหัสห้อง, value = ข้อมูลห้อง
-const MAX_PLAYERS = 8;
+const MAX_PLAYERS = 8;       // เพดานสูงสุดของทุกห้อง (หัวห้องตั้ง settings.maxPlayers ให้น้อยกว่านี้ได้)
+const MIN_ROOM_PLAYERS = 2;  // เล็กสุดที่ settings.maxPlayers ตั้งได้
+// จำนวนคนสูงสุดของห้องนี้ (หัวห้องเลือก) — ห้องที่ไม่มีค่านี้ใช้เพดาน 8
+const roomMax = (room) => room.settings.maxPlayers ?? MAX_PLAYERS;
 
 // ---------- ฟังก์ชันช่วย ----------
 function makeRoomCode() {
@@ -206,17 +210,44 @@ function roomState(room) {
 // (storeAction undoCanvas revealHint canvasPayload ...) จึงใช้กับเลนได้ตรง ๆ โดยไม่ต้องแก้
 // และทุกอย่างที่ส่งผ่าน lane.code จะถึงแค่สมาชิกทีมนั้น — นี่คือกำแพงกั้นระหว่างทีม
 // ══════════════════════════════════════════════════════════════════════
-const TEAMS = ["A", "B"];
+const TEAM_COUNTS = [2, 3, 4];   // หัวห้องเลือกจำนวนทีมได้ 2 / 3 / 4 (settings.teams) · ทีมละกี่คนไม่ล็อก แค่ต่างกันไม่เกิน 1
+const DEFAULT_TEAMS = 2;
 const TEAM_MIN_PLAYERS = 2;      // ทุกทีมต้องมีอย่างน้อยเท่านี้ถึงเริ่มเกมได้
 const FIRST_TEAM_BONUS = 100;    // ทีมที่ทายถูกก่อน ได้โบนัสต่อสมาชิกที่ทายถูก
 
 const isTeamMode = (room) => room.settings.mode === "team";
+// ชื่อทีมที่ใช้อยู่ในห้องนี้ เช่น 3 ทีม = ["A","B","C"]
+const activeTeams = (room) => TEAM_IDS.slice(0, room.settings.teams ?? DEFAULT_TEAMS);
 const teamCount = (room, t) => room.players.filter((p) => p.team === t).length;
-const autoTeam = (room) => (teamCount(room, "A") <= teamCount(room, "B") ? "A" : "B"); // ทีมที่คนน้อยกว่า เท่ากันเข้า A
+const teamSum = (room, t) => room.players.filter((p) => p.team === t).reduce((n, p) => n + (p.score || 0), 0);
+// คนเข้าใหม่/คนที่ยังไม่มีทีม: เข้าทีมที่คนน้อยที่สุด · คนเท่ากัน → ทีมที่คะแนนรวมต่ำกว่า (ช่วยให้สู้กันสูสี) · ยังเท่ากัน → ทีมหน้าสุด (A ก่อน)
+// (เข้าทีมที่คนน้อยสุดเสมอ → จำนวนคนต่างกันไม่เกิน 1 ตลอด)
+const autoTeam = (room) => {
+  const ids = activeTeams(room);
+  const minN = Math.min(...ids.map((t) => teamCount(room, t)));
+  const pool = ids.filter((t) => teamCount(room, t) === minN);
+  return pool.reduce((best, t) => (teamSum(room, t) < teamSum(room, best) ? t : best), pool[0]);
+};
+// ทีมละกี่คนได้สูงสุด (ห้องรับกี่คน แบ่งตามจำนวนทีม ปัดขึ้น)
+const teamCap = (room) => Math.ceil(roomMax(room) / activeTeams(room).length);
+
+// จัดทีมทั้งห้องใหม่ให้สมดุล (ใช้ computeBalancedTeams) แล้วย้ายผู้เล่นเข้า room ย่อยของทีมใหม่
+function balanceRoomTeams(room, shuffle = true) {
+  const map = computeBalancedTeams(room.players, { teams: activeTeams(room).length, shuffle });
+  for (const p of room.players) {
+    p.team = map.get(p.id);
+    syncTeamRoom(room, p);
+  }
+}
+// ทีมสมดุลพอเริ่มได้ไหม (ทุกคู่ทีมจำนวนคนต่างกันไม่เกิน 1 = มากสุด − น้อยสุด ≤ 1 · 2 vs 3 ได้ 2 vs 4 ไม่ได้)
+const teamsBalanced = (room) => {
+  const n = activeTeams(room).map((t) => teamCount(room, t));
+  return Math.max(...n) - Math.min(...n) <= 1;
+};
 const teamRoom = (room, t) => `${room.code}:${t}`;
 
 function teamScores(room) {
-  const out = { A: 0, B: 0 };
+  const out = Object.fromEntries(activeTeams(room).map((t) => [t, 0]));
   for (const p of room.players) if (p.team in out) out[p.team] += p.score;
   return out;
 }
@@ -244,7 +275,7 @@ function resetLane(lane, word, challenge) {
 // ให้ socket ของผู้เล่นอยู่ใน room ย่อยของทีมตัวเองเท่านั้น (team = null → ออกจากทั้งสอง)
 function syncTeamRoom(room, player) {
   // io.in(playerId) = ทุก socket ของผู้เล่นคนนี้ (ปกติมีตัวเดียว · ตอนหลุดอยู่ไม่มีเลยก็ไม่เป็นไร)
-  for (const t of TEAMS) {
+  for (const t of TEAM_IDS) {
     if (t === player.team) io.in(player.id).socketsJoin(teamRoom(room, t));
     else io.in(player.id).socketsLeave(teamRoom(room, t));
   }
@@ -252,9 +283,11 @@ function syncTeamRoom(room, player) {
 
 // ใช้ตอนหัวห้องสลับโหมด: team → จัดคนที่ยังไม่มีทีมให้สมดุล · classic → เคลียร์ทีมทุกคน
 function applyMode(room) {
+  // เพิ่งเปิดโหมดทีม และยังไม่มีใครมีทีมเลย (ปกติคือสลับมาจาก classic) → จัดทั้งห้องให้สมดุลทีเดียว
+  if (isTeamMode(room) && room.players.every((p) => !activeTeams(room).includes(p.team))) return balanceRoomTeams(room, false); // คงลำดับเดิม หัวห้องได้ทีม A
   for (const p of room.players) {
     if (isTeamMode(room)) {
-      if (!TEAMS.includes(p.team)) p.team = autoTeam(room);
+      if (!activeTeams(room).includes(p.team)) p.team = autoTeam(room);
     } else {
       p.team = null;
     }
@@ -262,7 +295,7 @@ function applyMode(room) {
   }
 }
 
-const laneList = (room) => (isTeamMode(room) && room.teams ? TEAMS.map((t) => room.teams[t]) : []);
+const laneList = (room) => (isTeamMode(room) && room.teams ? activeTeams(room).map((t) => room.teams[t]) : []);
 const laneOfDrawer = (room, id) => laneList(room).find((l) => l.drawerId === id) || null;
 const laneGuessers = (room, lane) =>
   room.players.filter((p) => p.team === lane.team && p.id !== lane.drawerId && p.connected !== false); // คนที่หลุดอยู่ไม่ต้องรอ
@@ -301,7 +334,7 @@ function teamRoundInfo(room, lane) {
     totalRounds: room.settings.rounds,
     team: lane.team,
     drawerId: lane.drawerId,
-    drawerIds: { A: room.teams.A.drawerId, B: room.teams.B.drawerId },
+    drawerIds: Object.fromEntries(activeTeams(room).map((t) => [t, room.teams[t].drawerId])),
     nextDrawerId: next,
     hint: lane.hintOpen && lane.word ? makeHint(lane.word) : null,
     hintAt: hintAt(room),
@@ -309,14 +342,14 @@ function teamRoundInfo(room, lane) {
     challenge: room.challenge ?? { type: "none" },
     intro: Boolean(room.intro),
     guessedIds: [...lane.guessedIds],
-    solvedTeams: TEAMS.filter((t) => room.teams[t].solved), // ชื่อทีมเท่านั้น ไม่มีชื่อคน/คำ
+    solvedTeams: activeTeams(room).filter((t) => room.teams[t].solved), // ชื่อทีมเท่านั้น ไม่มีชื่อคน/คำ
   };
 }
 
 function nextTeamTurn(room) {
   if (!rooms.has(room.code) || room.status !== "playing") return;
   if (room.teamTurn >= room.teamTotalTurns) return endGame(room);
-  for (const t of TEAMS) {
+  for (const t of activeTeams(room)) {
     const lane = room.teams[t];
     lane.drawerId = pickTeamDrawer(room, t);
     lane.skipped = lane.drawerId === null;
@@ -344,7 +377,7 @@ function startTeamDrawing(room, word) {
   const introMs = introMsFor(room.challenge);
   room.intro = introMs > 0; // ตั้งก่อน emit เพราะ teamRoundInfo อ่านค่านี้
   room.timeLeft = room.settings.drawTime;
-  for (const t of TEAMS) {
+  for (const t of activeTeams(room)) {
     const lane = room.teams[t];
     const skipped = lane.skipped;
     resetLane(lane, word, room.challenge);
@@ -663,6 +696,8 @@ const GUESS_MAX = 10;        // ทายได้ไม่เกิน 10 ค�
 const GUESS_WINDOW_MS = 5000; // ต่อ 5 วินาที (= เฉลี่ย 2 ครั้ง/วินาที · เผื่อ burst 10 ครั้งรวด)
 const LOOKUP_MAX = 15;        // ค้นหา/เข้าห้อง (join_room + rejoin) ได้ไม่เกิน 15 ครั้ง
 const LOOKUP_WINDOW_MS = 10000; // ต่อ 10 วินาที (คนพิมพ์รหัสผิดไม่ถึง · สแกนรหัสชนทันที)
+const NAME_CHECK_MAX = 15;
+const NAME_CHECK_WINDOW_MS = 10000;
 
 function rateOk(socket, key, max, windowMs) {
   const now = Date.now();
@@ -673,15 +708,13 @@ function rateOk(socket, key, max, windowMs) {
   times.push(now);
   return true;
 }
-const NAME_CHECK_MAX = 15;
-const NAME_CHECK_WINDOW_MS = 10000;
 
 // ตรวจชื่อเจ้าของก่อนเริ่มเล่น และจำกัดการไล่เดาชื่อ
 function nameOwnerOk(socket, name, key) {
   if (!rateOk(socket, "name-check", NAME_CHECK_MAX, NAME_CHECK_WINDOW_MS)) return "TOO_MANY_ATTEMPTS";
-
   return leaderboard.canUseName(leaderboard.loadScores(), name, key) ? null : "NAME_OWNED";
 }
+
 // ══════════════════════════════════════════════════════════════════════
 // การวาด (ข้อ 4) — รับจากคนวาด ส่งต่อให้คนอื่น เก็บไว้ให้คนเข้าห้องกลางตา และย้อนกลับได้
 //
@@ -1005,9 +1038,9 @@ function endRound(room) {
   const ended = { word: room.word, results };
   if (isTeamMode(room)) {
     // เฉลยตอนจบตาได้แล้ว · firstTeam = ทีมที่ทายถูกก่อน (null = ไม่มีใครทายถูก)
-    ended.teamGained = { A: 0, B: 0 };
+    ended.teamGained = Object.fromEntries(activeTeams(room).map((t) => [t, 0]));
     for (const p of room.players) if (p.team in ended.teamGained) ended.teamGained[p.team] += room.roundGains[p.id] || 0;
-    ended.firstTeam = TEAMS.find((t) => room.teams[t].rank === 1) ?? null;
+    ended.firstTeam = activeTeams(room).find((t) => room.teams[t].rank === 1) ?? null;
   }
   io.to(room.code).emit("round_end", ended);
   room.word = null;
@@ -1026,8 +1059,9 @@ function endGame(room) {
   const ended = { ranking };
   if (isTeamMode(room)) {
     const scores = teamScores(room);
-    ended.teamRanking = TEAMS.map((team) => ({ team, score: scores[team] })).sort((a, b) => b.score - a.score);
-    ended.winner = scores.A === scores.B ? null : scores.A > scores.B ? "A" : "B"; // เสมอ = null
+    ended.teamRanking = activeTeams(room).map((team) => ({ team, score: scores[team] })).sort((a, b) => b.score - a.score);
+    // ผู้ชนะ = ทีมคะแนนสูงสุด · ถ้าอันดับ 1 คะแนนเท่ากันตั้งแต่สองทีมขึ้นไป = เสมอ (null)
+    ended.winner = ended.teamRanking.length > 1 && ended.teamRanking[0].score === ended.teamRanking[1].score ? null : ended.teamRanking[0].team;
   }
   room.lastEnded = ended; // คนที่รีเฟรชหลังจบเกมจะได้ผลนี้อีกครั้งตอน rejoin
   // บันทึกคะแนนของทุกคนลงกระดาน "เล่นกับเพื่อน" — server บันทึกเอง client ส่งคะแนนมาไม่ได้
@@ -1053,9 +1087,20 @@ function applySettings(room, data) {
   if (sc) room.settings.challenges = sc;
   else if (data?.challenge === false) room.settings.challenges = ["none"];
   else if (data?.challenge === true) room.settings.challenges = [...DEFAULT_CHALLENGES];
+  // จำนวนผู้เล่นสูงสุดของห้อง (2–8) · ตั้งต่ำกว่าคนที่อยู่ในห้องตอนนี้ไม่ได้ (ไม่เตะใคร) → เมินเงียบ ๆ
+  const maxPlayers = Number(data?.maxPlayers);
+  if (Number.isInteger(maxPlayers) && maxPlayers >= MIN_ROOM_PLAYERS && maxPlayers <= MAX_PLAYERS && maxPlayers >= room.players.length) {
+    room.settings.maxPlayers = maxPlayers;
+  }
+  // จำนวนทีมในโหมดทีม (2 / 3 / 4) · ค่าอื่นเมินเงียบ ๆ · เปลี่ยนแล้วต้องจัดคนใหม่ให้พอดีจำนวนทีม
+  const teams = Number(data?.teams);
+  const teamsChanged = TEAM_COUNTS.includes(teams) && teams !== (room.settings.teams ?? DEFAULT_TEAMS);
+  if (TEAM_COUNTS.includes(teams)) room.settings.teams = teams;
   if ((data?.mode === "classic" || data?.mode === "team") && room.settings.mode !== data.mode) {
     room.settings.mode = data.mode;
     applyMode(room);
+  } else if (isTeamMode(room) && teamsChanged) {
+    balanceRoomTeams(room, false); // คงลำดับเดิม ไม่สุ่ม (กดจัดทีมให้สมดุลเองถ้าอยากสุ่ม)
   }
 }
 
@@ -1138,7 +1183,7 @@ function removePlayer(room, pid) {
   const code = room.code;
   if (!room.players.some((p) => p.id === pid)) return;
   cancelDrop(room, pid);
-  io.in(pid).socketsLeave([code, ...TEAMS.map((t) => `${code}:${t}`)]);
+  io.in(pid).socketsLeave([code, ...TEAM_IDS.map((t) => `${code}:${t}`)]);
   room.nameOwnerKeys?.delete(pid);
   room.players = room.players.filter((p) => p.id !== pid);
 
@@ -1157,7 +1202,7 @@ function removePlayer(room, pid) {
 
   if (room.status === "playing" && isTeamMode(room)) {
     // ทีมใดเหลือน้อยกว่า 2 คน เล่นต่อไม่ได้ (ไม่มีใครทาย) → จบเกม
-    if (TEAMS.some((t) => teamCount(room, t) < TEAM_MIN_PLAYERS)) return endGame(room);
+    if (activeTeams(room).some((t) => teamCount(room, t) < TEAM_MIN_PLAYERS)) return endGame(room);
     const lane = laneOfDrawer(room, pid);
     if (lane && room.phase === "choosing") {
       // คนวาดของทีมหลุดตอนเลือกคำ: ทีมนั้นถูกข้ามตานี้ ถ้าไม่เหลือคนวาดเลยก็ข้ามทั้งตา
@@ -1452,7 +1497,7 @@ io.on("connection", (socket) => {
       hostId: socket.data.pid,
       status: "lobby",
       players: [{ id: socket.data.pid, name, avatar: cleanAvatar(data.avatar), score: 0, isHost: true, team: null, connected: true, ready: false }],
-      settings: { mode: "classic", rounds: 3, drawTime: 60, difficulty: "easy", visibility: "private", challenges: [...DEFAULT_CHALLENGES] },
+      settings: { mode: "classic", rounds: 3, drawTime: 60, difficulty: "easy", visibility: "private", maxPlayers: MAX_PLAYERS, teams: DEFAULT_TEAMS, challenges: [...DEFAULT_CHALLENGES] },
     };
     const ownerHash = hashOwnerKey(data?.nameOwnerKey);
     if (ownerHash) room.nameOwnerKeys.set(socket.data.pid, ownerHash);
@@ -1474,14 +1519,14 @@ io.on("connection", (socket) => {
     const code = String(data?.code ?? "");
     const room = rooms.get(code);
 
-    if (!name) return callback({ ok: false, error: "INVALID_NAME" });
     if (!room) return callback({ ok: false, error: "ROOM_NOT_FOUND" });
+    if (!name) return callback({ ok: false, error: "INVALID_NAME" });
     if (!isNameAllowed(name)) return callback({ ok: false, error: "NAME_NOT_ALLOWED" });
     const nameError = nameOwnerOk(socket, name, data?.nameOwnerKey);
     if (nameError) return callback({ ok: false, error: nameError });
     // เป็นสมาชิกห้องนี้อยู่แล้ว (เช่นรีเฟรชแล้วกดเข้าห้องเดิมภายในเวลารอ) = กลับเข้าที่เดิม ไม่สร้างผู้เล่นซ้ำ
     if (room.players.some((p) => p.id === socket.data.pid)) return callback(rejoinRoom(socket, room));
-    if (room.players.length >= MAX_PLAYERS) return callback({ ok: false, error: "ROOM_FULL" });
+    if (room.players.length >= roomMax(room)) return callback({ ok: false, error: "ROOM_FULL" });
     if (room.players.some((p) => p.name === name)) return callback({ ok: false, error: "NAME_TAKEN" });
 
     leaveRoom(socket);
@@ -1567,15 +1612,32 @@ io.on("connection", (socket) => {
     removePlayer(room, targetId);
   });
 
-  // เลือกทีม (ตอนอยู่ในห้องรอ/จบเกม ไม่ใช่ตอนเล่น) — เฉพาะโหมดทีม
+  // เลือกทีม A–D ตามจำนวนทีมของห้อง (ตอนอยู่ในห้องรอ/จบเกม ไม่ใช่ตอนเล่น) — เฉพาะโหมดทีม
   socket.on("set_team", (data) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || room.status === "playing" || !isTeamMode(room)) return;
-    if (!TEAMS.includes(data?.team)) return;
+    if (!activeTeams(room).includes(data?.team)) return;
     const player = room.players.find((p) => p.id === socket.data.pid);
     if (!player) return;
+    if (player.team === data.team) return;
+    // ทีมเต็มโควตา (ห้องรับกี่คน หารจำนวนทีม ปัดขึ้น) → ย้ายเข้าไม่ได้
+    if (teamCount(room, data.team) >= teamCap(room)) {
+      return socket.emit("game_error", { code: "TEAM_FULL", message: `ทีม ${data.team} เต็มแล้ว` });
+    }
     player.team = data.team;
     syncTeamRoom(room, player);
+    io.to(room.code).emit("room_update", roomState(room));
+  });
+
+  // จัดทีมให้สมดุลใหม่ — หัวห้องเท่านั้น · ไม่ได้เล่นอยู่ · เฉพาะโหมดทีม
+  // (จำนวนคนต่างกันไม่เกิน 1 และคะแนนรวมสองทีมใกล้กัน · ถ้ายังไม่เคยเล่นก็คือสุ่มแบ่งเท่า ๆ กัน)
+  socket.on("balance_teams", () => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room || room.status === "playing" || !isTeamMode(room)) return;
+    if (room.hostId !== socket.data.pid) {
+      return socket.emit("game_error", { code: "NOT_HOST", message: "เฉพาะหัวห้องเท่านั้น" });
+    }
+    balanceRoomTeams(room);
     io.to(room.code).emit("room_update", roomState(room));
   });
 
@@ -1589,8 +1651,19 @@ io.on("connection", (socket) => {
       return socket.emit("game_error", { code: "NOT_ENOUGH_PLAYERS", message: "ต้องมีอย่างน้อย 2 คน" });
     }
 
-    if (isTeamMode(room) && TEAMS.some((t) => teamCount(room, t) < TEAM_MIN_PLAYERS)) {
-      return socket.emit("game_error", { code: "NOT_ENOUGH_PLAYERS", message: "แต่ละทีมต้องมีอย่างน้อย 2 คน" });
+    // เล่นอีกรอบหลังจบเกม (ไม่มีหน้าห้องรอให้กดจัดทีม): ทีมเบี้ยวเพราะมีคนเข้า/ออก → จัดให้สมดุลเองด้วยคะแนนเกมที่เพิ่งจบ
+    if (isTeamMode(room) && room.status === "ended" && !teamsBalanced(room)) balanceRoomTeams(room);
+    if (isTeamMode(room) && activeTeams(room).some((t) => teamCount(room, t) < TEAM_MIN_PLAYERS)) {
+      return socket.emit("game_error", {
+        code: "NOT_ENOUGH_PLAYERS",
+        message: `${activeTeams(room).length} ทีมต้องมีอย่างน้อย ${activeTeams(room).length * TEAM_MIN_PLAYERS} คน (ทีมละ ${TEAM_MIN_PLAYERS} คนขึ้นไป)`,
+      });
+    }
+    if (isTeamMode(room) && !teamsBalanced(room)) {
+      return socket.emit("game_error", {
+        code: "TEAMS_UNBALANCED",
+        message: `ทีมไม่สมดุล (${activeTeams(room).map((t) => `${t} ${teamCount(room, t)} คน`).join(" · ")}) แต่ละทีมต้องต่างกันไม่เกิน 1 คน กด "จัดทีมให้สมดุล" ก่อน`,
+      });
     }
     room.status = "playing";
     room.players.forEach((p) => (p.score = 0));
@@ -1600,8 +1673,8 @@ io.on("connection", (socket) => {
     room.challengeHistory = []; // เกมใหม่ (รวมเล่นอีกรอบ) = ตาแรกไม่มี Mini Challenge อีกครั้ง
     if (isTeamMode(room)) {
       // หนึ่งรอบ = ทีมที่ใหญ่กว่าวาดครบทุกคนหนึ่งรอบ (ทีมเล็กหมุนวนซ้ำ) · จำนวนตาทั้งเกมล็อกตอนเริ่ม
-      room.teams = { A: newLane(room, "A"), B: newLane(room, "B") };
-      room.teamPerRound = Math.max(teamCount(room, "A"), teamCount(room, "B"));
+      room.teams = Object.fromEntries(activeTeams(room).map((t) => [t, newLane(room, t)]));
+      room.teamPerRound = Math.max(...activeTeams(room).map((t) => teamCount(room, t)));
       room.teamTotalTurns = room.teamPerRound * room.settings.rounds;
       room.teamTurn = 0;
       room.drawerId = null; // โหมดทีมไม่ใช้ช่องนี้ (คนวาดอยู่ที่เลน)

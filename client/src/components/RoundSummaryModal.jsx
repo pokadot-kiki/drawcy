@@ -26,7 +26,7 @@ export default function RoundSummaryModal({ summary, players, myTeam = null, meI
               : "ตานี้ไม่มีทีมไหนทายถูก"}
           </p>
           <div className="team-vs">
-            {["A", "B"].map((t) => (
+            {Object.keys(summary.teamGained).map((t) => (
               <span key={t} className={`team-vs__chip team-vs__chip--${t}`}>
                 ทีม {t} <b>+{summary.teamGained[t] ?? 0}</b>
               </span>

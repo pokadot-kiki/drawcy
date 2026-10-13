@@ -42,7 +42,7 @@ export default function OpenRooms({ disabled, onJoin }) {
                 {/* ชื่อหัวห้องเป็นข้อความธรรมดาผ่าน {} ของ React เสมอ (ไม่ตีความเป็น HTML) */}
                 <span className="open-room__host">ห้องของ {r.host}</span>
                 <span className="open-room__meta">
-                  {r.mode === "team" ? "ทีม A vs B" : "แข่งเดี่ยว"} · คำระดับ{difficultyLabel(r.difficulty)} ·{" "}
+                  {r.mode === "team" ? "โหมดทีม" : "แข่งเดี่ยว"} · คำระดับ{difficultyLabel(r.difficulty)} ·{" "}
                   {r.status === "playing" ? "กำลังเล่น" : "รอผู้เล่น"}
                 </span>
                 <span className="open-room__count">
