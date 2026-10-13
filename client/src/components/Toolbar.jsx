@@ -79,7 +79,7 @@ export default function Toolbar({
           disabled={locked || !canUndo}
           onClick={onUndo}
         >
-          <Icon name="undo" size={28} />
+          <Icon name="undo" size={38} />
         </button>
         <button
           type="button"
@@ -89,7 +89,7 @@ export default function Toolbar({
           disabled={locked || !canRedo}
           onClick={onRedo}
         >
-          <Icon name="redo" size={28} />
+          <Icon name="redo" size={38} />
         </button>
       </div>
 
@@ -170,7 +170,7 @@ export default function Toolbar({
             aria-pressed={tool === TOOLS.PEN}
             onClick={() => onTool(TOOLS.PEN)}
           >
-            <Icon name="pen" size={30} />
+            <Icon name="pen" size={38} />
           </button>
         )}
         {!hidePen && (
@@ -181,7 +181,7 @@ export default function Toolbar({
             aria-pressed={tool === TOOLS.ERASER}
             onClick={() => onTool(TOOLS.ERASER)}
           >
-            <Icon name="eraser" size={30} />
+            <Icon name="eraser" size={38} />
           </button>
         )}
         {/* ถังสี — dont_lift_pen ซ่อนไปเลย เพราะกติกาคือ "ห้ามยกปากกา"
@@ -195,7 +195,7 @@ export default function Toolbar({
             onClick={() => onTool(TOOLS.BUCKET)}
           >
             {/* ทั้งถัง หูหิ้ว หยดสี ใช้สีที่เลือกอยู่สีเดียว (เฉดเข้ม/อ่อนของสีนั้น) */}
-            <Icon name="bucket" size={40} accent={color} />
+            <Icon name="bucket" size={48} accent={color} />
           </button>
         )}
         {/* รูปทรง: เส้นตรง สี่เหลี่ยม วงกลม — ลากเห็นเงาก่อน ปล่อยแล้วค่อยวาดจริง */}
@@ -214,12 +214,12 @@ export default function Toolbar({
               aria-pressed={tool === t}
               onClick={() => onTool(t)}
             >
-              <Icon name={icon} size={30} />
+              <Icon name={icon} size={38} />
             </button>
           ))}
         {/* ล้างจอทำทันที ไม่ใช่โหมด จึงไม่ได้ค้างสถานะกดไว้แบบสามปุ่มบน */}
         <button type="button" className="tool tool--danger" aria-label="ล้างจอ" onClick={onClear}>
-          <Icon name="trash" size={30} />
+          <Icon name="trash" size={38} />
         </button>
       </div>
     </div>
