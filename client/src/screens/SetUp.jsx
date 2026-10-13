@@ -13,6 +13,29 @@ import { DIFFICULTY_CHOICES, VISIBILITY_CHOICES, maxPlayersChoices, TEAM_COUNT_C
 const ROUND_CHOICES = [1, 2, 3, 4, 5];
 const TIME_CHOICES = [30, 45, 60, 90];
 
+// กติกา Solo แบบสั้นๆ · ตัวเลขทั้งหมดคัดจาก server จริง ไม่ได้เดา:
+// เวลาต่อด่านมาจาก ai.js levelConfig (1–2 = 60 วิ · 3–4 = 45 วิ · 5+ = 30 วิ) · ชีวิตจาก SOLO_LIVES = 3
+function SoloRules() {
+  return (
+    <div className="setup__solo">
+      <h3 className="setup__head">
+        <Icon name="robot" size={22} /> เล่นกับ AI ยังไง
+      </h3>
+      <ul className="setup__solo-list">
+        <li>
+          <b>ทุกด่านมีเวลาจำกัด</b> และสั้นลงเมื่อด่านสูงขึ้น — ด่าน 1–2 วาด 60 วินาที · ด่าน 3–4 วาด 45 วินาที · ด่าน 5 ขึ้นไปวาด 30 วินาที
+        </li>
+        <li>
+          แต่ละด่านมี 2 ช่วง — <b>คุณวาดให้ AI ทาย</b> แล้ว <b>AI วาดให้คุณทาย</b> (ภาพวาดจริงของคน)
+        </li>
+        <li>
+          <b>มี 3 ชีวิต</b> — ทายไม่ถูกในด่านไหนเสีย 1 ชีวิต หมดชีวิตแล้วจบเกมและบันทึกคะแนนขึ้น Leaderboard
+        </li>
+      </ul>
+    </div>
+  );
+}
+
 export default function SetUp({ connected, profile, onProfile, onBack, onEntered, onError, onStartSolo }) {
   const [mode, setMode] = useState("classic"); // classic | team | ai (ai = Solo แข่งกับ AI ไม่สร้างห้อง)
   const [rounds, setRounds] = useState(3);
@@ -67,48 +90,55 @@ export default function SetUp({ connected, profile, onProfile, onBack, onEntered
               )}
             </div>
           )}
-          <div className="setup__opt">
-            <h3 className="setup__head">
-              <Icon name="flag" size={22} /> จำนวนรอบ
-            </h3>
-            <div className="segmented" role="group" aria-label="จำนวนรอบ">
-              {ROUND_CHOICES.map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  className={rounds === n ? "seg seg--active" : "seg"}
-                  aria-pressed={rounds === n}
-                  onClick={() => setRounds(n)}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="setup__opt">
-            <h3 className="setup__head">
-              <Icon name="clock" size={22} /> เวลาวาด <small>(วินาที)</small>
-            </h3>
-            <div className="segmented" role="group" aria-label="เวลาวาดต่อตา">
-              {TIME_CHOICES.map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  className={drawTime === n ? "seg seg--active" : "seg"}
-                  aria-pressed={drawTime === n}
-                  onClick={() => setDrawTime(n)}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* จำนวนรอบกับเวลาวาดเป็นของเกมห้องเท่านั้น — Solo ไม่มีสองอย่างนี้ server คุมเวลาเองตามด่าน (ข้อ 2) */}
+          {!isAI && (
+            <>
+              <div className="setup__opt">
+                <h3 className="setup__head">
+                  <Icon name="flag" size={22} /> จำนวนรอบ
+                </h3>
+                <div className="segmented" role="group" aria-label="จำนวนรอบ">
+                  {ROUND_CHOICES.map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      className={rounds === n ? "seg seg--active" : "seg"}
+                      aria-pressed={rounds === n}
+                      onClick={() => setRounds(n)}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="setup__opt">
+                <h3 className="setup__head">
+                  <Icon name="clock" size={22} /> เวลาวาด <small>(วินาที)</small>
+                </h3>
+                <div className="segmented" role="group" aria-label="เวลาวาดต่อตา">
+                  {TIME_CHOICES.map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      className={drawTime === n ? "seg seg--active" : "seg"}
+                      aria-pressed={drawTime === n}
+                      onClick={() => setDrawTime(n)}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
           <div className="setup__opt">
             <h3 className="setup__head">
               <Icon name="star" size={22} /> ความยากของคำ
             </h3>
             <OptionRow label="ระดับความยากของคำ" choices={DIFFICULTY_CHOICES} value={difficulty} onChange={setDifficulty} />
           </div>
+          {/* อธิบายวิธีเล่น Solo ให้ตรงกับที่ server ทำจริง (ตัวเลขจาก server/ai.js levelConfig + SOLO_LIVES) */}
+          {isAI && <SoloRules />}
           {/* โหมดแข่งกับ AI ไม่ต้องมีห้อง จึงซ่อนตัวเลือกประเภทห้อง */}
           {!isAI && (
             <div className="setup__opt">
@@ -118,13 +148,13 @@ export default function SetUp({ connected, profile, onProfile, onBack, onEntered
               <OptionRow label="ประเภทห้อง" choices={VISIBILITY_CHOICES} value={visibility} onChange={setVisibility} />
             </div>
           )}
-          <p className="setup__note">
-            {isAI
-              ? "แข่งกับ AI: วาดคนเดียว AI ทายภาพ ความยากของคำใช้ค่าที่เลือกด้านบน"
-              : visibility === "public"
+          {!isAI && (
+            <p className="setup__note">
+              {visibility === "public"
                 ? "Public: ห้องขึ้นในรายการหน้าแรก ใครก็กดเข้าได้ · Mini Challenge เปิด/ปิดได้ในห้องรอ"
                 : "Private: เข้าได้ด้วยรหัสห้องหรือลิงก์เชิญเท่านั้น · Mini Challenge เปิด/ปิดได้ในห้องรอ"}
-          </p>
+            </p>
+          )}
           <small className="name-owner-note">ชื่อบน Leaderboard ผูกกับเบราว์เซอร์เครื่องนี้ · ล้างข้อมูลหรือเปลี่ยนเครื่องอาจใช้ชื่อเดิมไม่ได้</small>
           <p className="setup__who">
             <AvatarArt index={avatar} size={34} />

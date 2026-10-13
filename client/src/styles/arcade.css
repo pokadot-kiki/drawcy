@@ -87,7 +87,8 @@ body,
 .team-winner,
 .podium__item,
 .gains__row,
-.score-team__head {
+.score-team__head,
+.setup__solo {
   border-radius: var(--r-ctl);
 }
 
