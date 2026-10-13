@@ -101,6 +101,19 @@ export default function WaitingRoom({ room, me, onLeave }) {
     socket.emit("update_settings", { ...room.settings, ...patch });
   }
 
+  // ที่นั่งที่ยังว่าง — ขนาดเท่ากับการ์ดผู้เล่นจริงทุกประการ (ความสูงเท่ากัน ดู CSS .player-card)
+  // ทำให้ทั้งห้องดู "เต็มผัง" ไม่ใช่การ์ดลอยอยู่สองใบแล้วเหลือที่ว่างเป็นพรวด
+  function renderEmptySeats(count, keyPrefix) {
+    return Array.from({ length: Math.max(0, count) }, (_, i) => (
+      <div className="player-card player-card--empty" key={`${keyPrefix}-seat-${i}`} aria-hidden="true">
+        <span className="player-card__seat">
+          <Icon name="users" size={18} />
+        </span>
+        <span className="player-card__seat-text">ว่าง</span>
+      </div>
+    ));
+  }
+
   function renderPlayer(player) {
     return (
       <div
@@ -325,6 +338,7 @@ export default function WaitingRoom({ room, me, onLeave }) {
                           </h3>
                           <div className="player-list">
                             {members.map(renderPlayer)}
+                            {renderEmptySeats(teamCap - members.length, t)}
                           </div>
                           {myTeam !== t && (
                             <button
@@ -342,7 +356,10 @@ export default function WaitingRoom({ room, me, onLeave }) {
                   </div>
                 </>
               ) : (
-                <div className="player-list">{room.players.map(renderPlayer)}</div>
+                <div className="player-list">
+                  {room.players.map(renderPlayer)}
+                  {renderEmptySeats(maxPlayers - room.players.length, "solo")}
+                </div>
               )}
               {/* อยู่คนเดียว = มาสคอตถือนาฬิการอเพื่อน */}
               {room.players.length < 2 && <MascotNote mood="wait">รอเพื่อนเข้าห้อง...</MascotNote>}

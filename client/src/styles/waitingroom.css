@@ -983,7 +983,9 @@
   }
 
   .wr-card--players.wr-card--waiting .mascot-note {
-    flex: 1;
+    /* ไม่แย่งที่กับรายชื่อ — เดิม flex: 1 ทำให้รายชื่อกับการ์ดมาสคอตแบ่งครึ่งกัน
+       พอมีที่นั่งว่างด้วย รายชื่อจะเหลือแค่ 2 แถวแล้วถูกตัด */
+    flex: 0 0 auto;
     width: min(100%, 160px);
     max-width: 160px;
     margin: 4px auto;
@@ -1165,5 +1167,65 @@
   .wr-card--players.wr-card--waiting .wr-actions .form-note {
     font-size: 12px;
     line-height: 1.2;
+  }
+}
+
+/* ==========================================================================
+   ข้อ 5 — การ์ดผู้เล่นสูงคงที่ + ที่นั่งว่างขนาดเท่ากัน
+   ปัญหาเดิม: .wr-card--players > .player-list มี flex: 1 และแถวเป็น auto
+   พอมีผู้เล่น 1–4 คนในห้อง 8 ที่นั่ง แถวจึงยืดเต็มความสูงคอลัมน์ การ์ดเลยสูง 83–101px
+   (ยิ่งจอสูงยิ่งอ้วน) ทั้งที่เนื้อหาข้างในต้องการแค่ ~50px
+   แก้: ตรึงความสูงแถวไว้ที่ 64px แล้วเติม "ที่นั่งว่าง" ให้ครบจำนวนที่นั่งของห้อง
+   ทำให้ผังห้องนิ่งเท่ากันทุกความสูงจอ และเห็นทันทีว่ายังเหลือกี่ที่
+   ========================================================================== */
+
+.player-card--empty {
+  border: 2px dashed var(--muted);
+  background: var(--tab-idle);
+  color: var(--muted);
+  opacity: 0.75;
+}
+
+.player-card__seat {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 2px dashed currentColor;
+  border-radius: 50%;
+}
+
+.player-card__seat-text {
+  font-family: var(--font-head);
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+
+@media (min-width: 1001px) and (min-height: 600px) {
+  /* ความสูงการ์ดคงที่ทุกใบ (รวมที่นั่งว่าง) ไม่ยืดตามความสูงคอลัมน์ */
+  .wr-card--players > .player-list {
+    align-content: start;
+    grid-auto-rows: 58px;
+    gap: 6px;
+  }
+
+  /* อยู่คนเดียวก็ยังเห็นที่นั่งว่างครบ — ให้รายการเลื่อนในกรอบแทนที่จะดันการ์ดให้ยืด */
+  .wr-card--players.wr-card--waiting > .player-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* คอลัมน์ทีมแคบกว่า ใช้การ์ดเตี้ยลงเล็กน้อย (ยังอยู่ในช่วง 56–68px ที่ต้องการ) */
+  .wr-card--players .team-col .player-list {
+    align-content: start;
+    grid-auto-rows: 52px;
+    gap: 6px;
+  }
+
+  .wr-card--players .team-col .player-card__seat {
+    width: 26px;
+    height: 26px;
   }
 }
