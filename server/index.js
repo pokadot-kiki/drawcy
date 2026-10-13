@@ -8,6 +8,7 @@ const crypto = require("crypto");
 const path = require("path");
 const { Server } = require("socket.io");
 const { cleanName } = require("./clean");
+const { hashOwnerKey } = require("./name-ownership");
 const leaderboard = require("./leaderboard");
 const ai = require("./ai");
 const aiDrawings = require("./ai-drawings");
@@ -672,7 +673,15 @@ function rateOk(socket, key, max, windowMs) {
   times.push(now);
   return true;
 }
+const NAME_CHECK_MAX = 15;
+const NAME_CHECK_WINDOW_MS = 10000;
 
+// ตรวจชื่อเจ้าของก่อนเริ่มเล่น และจำกัดการไล่เดาชื่อ
+function nameOwnerOk(socket, name, key) {
+  if (!rateOk(socket, "name-check", NAME_CHECK_MAX, NAME_CHECK_WINDOW_MS)) return "TOO_MANY_ATTEMPTS";
+
+  return leaderboard.canUseName(leaderboard.loadScores(), name, key) ? null : "NAME_OWNED";
+}
 // ══════════════════════════════════════════════════════════════════════
 // การวาด (ข้อ 4) — รับจากคนวาด ส่งต่อให้คนอื่น เก็บไว้ให้คนเข้าห้องกลางตา และย้อนกลับได้
 //
@@ -1024,7 +1033,7 @@ function endGame(room) {
   // บันทึกคะแนนของทุกคนลงกระดาน "เล่นกับเพื่อน" — server บันทึกเอง client ส่งคะแนนมาไม่ได้
   // คนที่ได้ 0 ไม่บันทึก (ไม่ได้เล่นจริง) · saveScore ไม่ throw จึงไม่ทำให้จบเกมพัง
   for (const p of room.players) {
-    if (p.score > 0) leaderboard.saveScore({ name: p.name, score: p.score, levelReached: 0, board: "multi" });
+    if (p.score > 0) leaderboard.saveScore({ name: p.name, score: p.score, levelReached: 0, board: "multi", nameOwnerKey: room.nameOwnerKeys?.get(p.id) });
   }
   io.to(room.code).emit("game_end", ended);
   io.to(room.code).emit("room_update", roomState(room));
@@ -1130,6 +1139,7 @@ function removePlayer(room, pid) {
   if (!room.players.some((p) => p.id === pid)) return;
   cancelDrop(room, pid);
   io.in(pid).socketsLeave([code, ...TEAMS.map((t) => `${code}:${t}`)]);
+  room.nameOwnerKeys?.delete(pid);
   room.players = room.players.filter((p) => p.id !== pid);
 
   if (room.players.length === 0) {
@@ -1333,7 +1343,7 @@ function endSoloGame(socket, solo) {
   const result = { name: solo.name, score: solo.totalScore, levelReached: solo.level };
   solo.over = true;
   socket.data.solo = null;
-  leaderboard.saveScore(result);
+  leaderboard.saveScore({ ...result, nameOwnerKey: solo.nameOwnerKey });
   socket.emit("ai_game_end", {
     totalScore: result.score,
     levelReached: result.levelReached,
@@ -1429,17 +1439,22 @@ io.on("connection", (socket) => {
     if (typeof callback !== "function") return;
     const name = cleanName(data?.name);
     if (!name) return callback({ ok: false, error: "INVALID_NAME" });
+    const nameError = nameOwnerOk(socket, name, data?.nameOwnerKey);
+    if (nameError) return callback({ ok: false, error: nameError });
 
     leaveRoom(socket);
 
     const code = makeRoomCode();
     const room = {
       code,
+      nameOwnerKeys: new Map(),
       hostId: socket.data.pid,
       status: "lobby",
       players: [{ id: socket.data.pid, name, avatar: cleanAvatar(data.avatar), score: 0, isHost: true, team: null, connected: true, ready: false }],
       settings: { mode: "classic", rounds: 3, drawTime: 60, difficulty: "easy", visibility: "private", challenges: [...DEFAULT_CHALLENGES] },
     };
+    const ownerHash = hashOwnerKey(data?.nameOwnerKey);
+    if (ownerHash) room.nameOwnerKeys.set(socket.data.pid, ownerHash);
     rooms.set(code, room);
 
     socket.join(code);
@@ -1460,6 +1475,8 @@ io.on("connection", (socket) => {
 
     if (!name) return callback({ ok: false, error: "INVALID_NAME" });
     if (!room) return callback({ ok: false, error: "ROOM_NOT_FOUND" });
+    const nameError = nameOwnerOk(socket, name, data?.nameOwnerKey);
+    if (nameError) return callback({ ok: false, error: nameError });
     // เป็นสมาชิกห้องนี้อยู่แล้ว (เช่นรีเฟรชแล้วกดเข้าห้องเดิมภายในเวลารอ) = กลับเข้าที่เดิม ไม่สร้างผู้เล่นซ้ำ
     if (room.players.some((p) => p.id === socket.data.pid)) return callback(rejoinRoom(socket, room));
     if (room.players.length >= MAX_PLAYERS) return callback({ ok: false, error: "ROOM_FULL" });
@@ -1467,6 +1484,8 @@ io.on("connection", (socket) => {
 
     leaveRoom(socket);
     const joiner = { id: socket.data.pid, name, avatar: cleanAvatar(data.avatar), score: 0, isHost: false, team: null, connected: true, ready: false };
+    const ownerHash = hashOwnerKey(data?.nameOwnerKey);
+    if (ownerHash) (room.nameOwnerKeys ??= new Map()).set(socket.data.pid, ownerHash);
     if (isTeamMode(room)) joiner.team = autoTeam(room); // โหมดทีม: เข้าทีมที่คนน้อยกว่าอัตโนมัติ (รวมคนเข้ากลางเกม)
     room.players.push(joiner);
     socket.join(code);
@@ -1790,10 +1809,12 @@ io.on("connection", (socket) => {
   socket.on("ai_start", (data) => {
     const name = cleanName(data?.name);
     if (!name) return socket.emit("game_error", { code: "INVALID_NAME", message: "กรุณาใส่ชื่อ" });
+    const nameError = nameOwnerOk(socket, name, data?.nameOwnerKey);
+    if (nameError) return socket.emit("game_error", { code: nameError, message: nameError === "NAME_OWNED" ? "ชื่อนี้มีเจ้าของแล้ว ลองชื่ออื่นนะ" : "ลองใหม่อีกครั้งในอีกสักครู่" });
     leaveRoom(socket); // ผู้เล่นหนึ่งคนอยู่ได้อย่างเดียว: ห้อง หรือ Solo
     stopSolo(socket);  // กดเริ่มซ้ำ = เริ่มเกมใหม่ เกมเก่าทิ้ง
     const solo = {
-      name, difficulty: LEVELS.includes(data?.difficulty) ? data.difficulty : null, level: 1, lives: SOLO_LIVES, totalScore: 0, usedWords: new Set(), roundId: 0,
+      name, nameOwnerKey: data?.nameOwnerKey, difficulty: LEVELS.includes(data?.difficulty) ? data.difficulty : null, level: 1, lives: SOLO_LIVES, totalScore: 0, usedWords: new Set(), roundId: 0,
       over: false, drawing: false, busy: false, roundTimer: null, nextTimer: null,
       guessing: false, drawNext: false, passed: false, strokeTimers: [],
     };

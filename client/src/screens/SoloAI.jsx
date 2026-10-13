@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { socket } from "../socket";
+import { nameOwnerKey } from "../nameOwnerKey";
 import Logo from "../components/Logo";
 import Timer from "../components/Timer";
 import Canvas from "../components/Canvas";
@@ -225,7 +226,7 @@ export default function SoloAI({ initialName = "", boot = null, onName, onBack }
       // AI ไม่ว่าง: ด่านเดินต่อ ไม่เสียชีวิต ส่งภาพใหม่ได้ (App โชว์ Toast ให้แล้ว)
       if (err?.code === "AI_UNAVAILABLE") setThink(false);
       // ชื่อไม่ผ่าน: ยังไม่ได้เริ่มเกมจริง กลับไปกรอกใหม่
-      if (err?.code === "INVALID_NAME" && phaseRef.current === "starting") setPhase("intro");
+      if (["INVALID_NAME", "NAME_OWNED", "NAME_NOT_ALLOWED"].includes(err?.code) && phaseRef.current === "starting") setPhase("intro");
     };
     socket.on("ai_round_start", onRoundStart);
     socket.on("ai_guess", onGuess);
@@ -265,7 +266,7 @@ export default function SoloAI({ initialName = "", boot = null, onName, onBack }
     setLives(3);
     setFinal(null);
     setPhase("starting");
-    socket.emit("ai_start", { name: initialName, difficulty: boot.difficulty });
+    socket.emit("ai_start", { name: initialName, difficulty: boot.difficulty, nameOwnerKey: nameOwnerKey() });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -324,7 +325,7 @@ export default function SoloAI({ initialName = "", boot = null, onName, onBack }
     setLives(3);
     setFinal(null);
     setPhase("starting");
-    socket.emit("ai_start", { name, difficulty });
+    socket.emit("ai_start", { name, difficulty, nameOwnerKey: nameOwnerKey() });
   }
 
   // ช่วง 2: ส่งคำที่พิมพ์ให้ server ตัดสิน (ฝั่งนี้ไม่รู้คำตอบเลย)
@@ -414,6 +415,7 @@ export default function SoloAI({ initialName = "", boot = null, onName, onBack }
             autoComplete="off"
             autoFocus
           />
+          <small className="name-owner-note">ชื่อนี้ผูกกับเบราว์เซอร์เครื่องนี้ · ล้างข้อมูลหรือเปลี่ยนเครื่องอาจใช้ชื่อเดิมไม่ได้</small>
           <span className="field__label" id="solo-diff-label">
             ระดับความยากของคำ
           </span>

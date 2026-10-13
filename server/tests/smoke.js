@@ -2893,7 +2893,48 @@ async function main() {
 
   // ปิดทุก socket เพื่อให้โปรเซสจบได้
   for (const rec of [A, B, C, ...others]) rec.socket.disconnect();
+  await runPart("40. เจ้าของชื่อ Leaderboard กันสวมรอยก่อนเข้าห้องและ Solo", async () => {
+    const lb = require("../leaderboard");
+    const keyA = "a".repeat(32), keyB = "b".repeat(32), keyC = "c".repeat(32);
+    lb.saveScore({ name: "OwnerName", score: 80, levelReached: 1, nameOwnerKey: keyA });
+    check("คะแนนแรกเก็บเฉพาะ hash กุญแจเจ้าของ", lb.loadScores().find((r) => r.name === "OwnerName")?.ownerHash?.length, 64);
+
+    const ownerHost = track(await connect());
+    const other = track(await connect());
+    const rejectedCreate = await emitAck(other.socket, "create_room", { name: "OwnerName", avatar: 0, nameOwnerKey: keyB });
+    check("create_room ปฏิเสธชื่อที่มีเจ้าของ", rejectedCreate?.error, "NAME_OWNED");
+    const created = await emitAck(ownerHost.socket, "create_room", { name: "OwnerName", avatar: 0, nameOwnerKey: keyA });
+    checkOk("เจ้าของเดิมสร้างห้องด้วยกุญแจตรงกันได้", created?.ok);
+    const rejectedJoin = await emitAck(other.socket, "join_room", { code: created.code, name: "OwnerName", avatar: 0, nameOwnerKey: keyB });
+    check("join_room ปฏิเสธชื่อที่มีเจ้าของ", rejectedJoin?.error, "NAME_OWNED");
+    const guest = track(await connect());
+    const acceptedJoin = await emitAck(guest.socket, "join_room", { code: created.code, name: "ownername", avatar: 0, nameOwnerKey: keyA });
+    checkOk("เทียบชื่อแบบไม่สนตัวพิมพ์และเจ้าของเข้าห้องได้", acceptedJoin?.ok);
+
+    other.clear();
+    other.socket.emit("ai_start", { name: "OwnerName", nameOwnerKey: keyB });
+    const soloDenied = await other.wait("game_error", (e) => e.code === "NAME_OWNED", 1500).catch(() => null);
+    check("Solo ปฏิเสธชื่อที่มีเจ้าของก่อนเริ่ม", soloDenied?.code, "NAME_OWNED");
+    other.socket.emit("ai_start", { name: "OwnerName", nameOwnerKey: keyA });
+    const soloAllowed = await other.wait("ai_round_start", null, 2000).catch(() => null);
+    checkOk("Solo ยอมรับกุญแจเจ้าของที่ตรงกัน", !!soloAllowed);
+
+    const fresh = await emitAck(other.socket, "create_room", { name: "FirstScoreName", avatar: 0, nameOwnerKey: keyC });
+    checkOk("ชื่อใหม่ที่ยังไม่เคยติดอันดับใช้ได้", fresh?.ok);
+    lb.saveScore({ name: "FirstScoreName", score: 22, levelReached: 1, nameOwnerKey: keyC });
+    check("คนแรกที่บันทึกคะแนนได้กลายเป็นเจ้าของ", lb.canUseName(lb.loadScores(), " firstscorename ", keyC), true);
+    check("หลังบันทึกคะแนน กุญแจอื่นใช้ชื่อนี้ไม่ได้", lb.canUseName(lb.loadScores(), "FirstScoreName", keyB), false);
+
+    const roomJson = JSON.stringify(ownerHost.dump());
+    const roomsApi = await (await fetch(`${URL}/api/rooms`)).text();
+    const boardApi = await (await fetch(`${URL}/api/leaderboard?board=multi`)).text();
+    const hiddenHash = lb.loadScores().find((r) => r.name === "OwnerName")?.ownerHash;
+    checkOk("event และ API ไม่มี key หรือ hash เจ้าของชื่อ", ![keyA, keyB, keyC, hiddenHash, "ownerHash"].some((v) => v && (roomJson.includes(v) || roomsApi.includes(v) || boardApi.includes(v))));
+    check("ข้อมูลคะแนนเก่าที่ไม่มี ownerHash ยังใช้ชื่อได้", lb.canUseName([{ name: "Legacy", score: 10, playedAt: "2026-01-01 00:00" }], "legacy", keyB), true);
+    for (const rec of [ownerHost, other, guest]) rec.socket.disconnect();
+  });
 }
+
 
 // กันเทสค้าง: ถ้าเกิน 300 วิให้หยุด (ข้อ 29 เพิ่มราว 20 วิ) (ไม่หน่วงไม่ให้โปรเซสปิดตัว)
 // เดิมตั้งไว้ 90 วิ ตอนที่ชุดเทสทั้งชุดใช้ราว 35 วิ — ข้อ 5 เพิ่มการสร้างห้องจริง 30 ห้อง

@@ -75,6 +75,7 @@ export default function Lobby({
               <Icon name="dice" size={30} />
             </button>
           </div>
+          <small className="name-owner-note">ชื่อนี้ผูกกับเบราว์เซอร์เครื่องนี้ · ล้างข้อมูลหรือเปลี่ยนเครื่องอาจใช้ชื่อเดิมไม่ได้</small>
 
           <div className="home__buttons">
             <button type="button" className="big-btn big-btn--green" disabled={!connected} onClick={onOpenSetup}>

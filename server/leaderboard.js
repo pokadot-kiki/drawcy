@@ -12,6 +12,7 @@
 const fs = require("fs");
 const path = require("path");
 const { cleanName } = require("./clean");
+const { hashOwnerKey, normalizeOwnerName, ownerOfName, canUseName } = require("./name-ownership");
 
 // เทสตั้ง SCORES_FILE ชี้ไปไฟล์ชั่วคราว จะได้ไม่ไปทับคะแนนจริง
 const SCORES_FILE = process.env.SCORES_FILE || path.join(__dirname, "data", "scores.json");
@@ -182,12 +183,16 @@ function cleanCount(value) {
 // เวลาเล่น (playedAt) server ใส่เอง ไม่รับจากข้างนอก
 // คืนแถวที่บันทึก หรือ null ถ้าชื่อว่าง/บันทึกไม่สำเร็จ (ไม่ throw ให้เกมล่ม)
 // board: "multi" = คะแนนจากเกมห้อง (index.js เรียกตอน endGame) · ไม่ใส่ = solo
-function saveScore({ name, score, levelReached, board } = {}, playedAt = new Date()) {
+function saveScore({ name, score, levelReached, board, nameOwnerKey } = {}, playedAt = new Date()) {
   const cleanedName = cleanName(name);
   if (!cleanedName) return null;
   try {
     backupIfBroken();
     const rows = loadScores();
+    const existingOwner = ownerOfName(rows, cleanedName);
+    const suppliedOwner = hashOwnerKey(nameOwnerKey);
+    // ตรวจซ้ำตอนบันทึก ป้องกันการเรียก saveScore ข้ามด่านตรวจชื่อ
+    if (existingOwner && existingOwner !== suppliedOwner) return null;
     const row = {
       id: rows.reduce((max, r) => Math.max(max, Number(r.id) || 0), 0) + 1,
       name: cleanedName,
@@ -195,6 +200,7 @@ function saveScore({ name, score, levelReached, board } = {}, playedAt = new Dat
       levelReached: cleanCount(levelReached),
       playedAt: formatPlayedAt(playedAt),
     };
+    if (existingOwner || suppliedOwner) row.ownerHash = existingOwner || suppliedOwner;
     if (board === "multi") row.board = "multi"; // solo ไม่ใส่ช่องนี้ แถวจึงหน้าตาเหมือนเดิมทุกตัวอักษร
     rows.push(row);
     writeScores(rows);
@@ -255,4 +261,4 @@ function rankOf({ name, score, levelReached }) {
   return ahead.length + 1;
 }
 
-module.exports = { init, flush, SCORES_FILE, saveScore, getLeaderboard, rankOf, isValidMonth, isValidBoard, loadScores, writeScores, formatPlayedAt };
+module.exports = { init, flush, SCORES_FILE, saveScore, getLeaderboard, rankOf, isValidMonth, isValidBoard, loadScores, writeScores, formatPlayedAt, canUseName, normalizeOwnerName };
