@@ -5,6 +5,7 @@ import { randomName } from "../playerName";
 import { AvatarArt, Icon } from "../components/Icons";
 import { useEnterRoom } from "../hooks/useEnterRoom";
 import OptionRow from "../components/OptionRow";
+import AvatarPicker from "../components/AvatarPicker";
 import { DIFFICULTY_CHOICES, VISIBILITY_CHOICES } from "../roomOptions";
 
 // หน้า SET UP (กดสร้างห้องแล้วมาหน้านี้): ซ้าย ตั้งค่ารอบ/เวลา · ขวา การ์ดโหมดใหญ่สองใบ · ล่าง ปุ่มสร้างห้อง
@@ -12,12 +13,13 @@ import { DIFFICULTY_CHOICES, VISIBILITY_CHOICES } from "../roomOptions";
 const ROUND_CHOICES = [1, 2, 3, 4, 5];
 const TIME_CHOICES = [30, 45, 60, 90];
 
-export default function SetUp({ connected, profile, onBack, onEntered, onError, onStartSolo }) {
+export default function SetUp({ connected, profile, onProfile, onBack, onEntered, onError, onStartSolo }) {
   const [mode, setMode] = useState("classic"); // classic | team | ai (ai = Solo แข่งกับ AI ไม่สร้างห้อง)
   const [rounds, setRounds] = useState(3);
   const [drawTime, setDrawTime] = useState(60);
   const [difficulty, setDifficulty] = useState("easy"); // ชุดคำ (ไม่เกี่ยวกับเวลา)
   const [visibility, setVisibility] = useState("private");
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   // Challenge เลือกเปิด/ปิดทีละใบในห้องรอ (การ์ด 4 ใบ) ไม่ตั้งที่นี่แล้ว — ห้องเริ่มด้วยชุดเริ่มต้นของ server
   const { busy, enter } = useEnterRoom({ connected, onEntered, onError });
   const { name, avatar } = profile;
@@ -111,6 +113,10 @@ export default function SetUp({ connected, profile, onBack, onEntered, onError, 
             <AvatarArt index={avatar} size={34} />
             <span>{name.trim() || "ยังไม่ได้ใส่ชื่อ"}</span>
           </p>
+          <button type="button" className="btn setup-avatar__toggle" aria-expanded={showAvatarPicker} onClick={() => setShowAvatarPicker((open) => !open)}>
+            {showAvatarPicker ? "ซ่อนอวตาร" : "เปลี่ยนอวตาร"}
+          </button>
+          {showAvatarPicker && <AvatarPicker compact value={avatar} onChange={(nextAvatar) => onProfile({ ...profile, avatar: nextAvatar })} />}
         </section>
 
         <div className="mode-cards deco-host" role="radiogroup" aria-label="โหมดเกม">

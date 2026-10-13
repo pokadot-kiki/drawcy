@@ -30,7 +30,7 @@ export const PAL = {
   A: "#dcd7c8", // เทาอ่อน
 };
 
-// ── อวตาร 6 ตัว 16×16 (ครึ่งซ้าย 8 ช่อง) ──
+// ── อวตาร 12 ตัว 16×16 (ครึ่งซ้าย 8 ช่อง) ──
 const AVATAR_ART = [
   {
     name: "แพนด้า",
@@ -156,6 +156,48 @@ const AVATAR_ART = [
       ".kk.kuk.",
       "....kk..",
       "........",
+    ],
+  },
+  {
+    name: "กระต่าย",
+    rows: [
+      "..kk....", ".kPP....", ".kPP....", "..kk....", "....kkkk", "...kwwww", "..kwwwww", ".kwwkwwk",
+      ".kwwwwww", "..kwwkk.", "..kwwkwk", "...kwww.", "...kkwww", "...kwwww", "....kkww", "......kk",
+    ],
+  },
+  {
+    name: "หมี",
+    rows: [
+      "..kkkk..", ".knnnnk.", "kknnnnkk", "knNNnnnn", "knNNnnnn", "knnnnnnn", "knknnnnn", "knnnknnn",
+      "knnnnnnn", ".knnkkkn", ".knnknnn", "..knnnnn", "..knnnnn", "...knnnn", "....knnn", ".....kkk",
+    ],
+  },
+  {
+    name: "เพนกวิน",
+    rows: [
+      "...kkkkk", "..kkkkkk", ".kkkkkkk", "kkkkkkkk", "kkkkwwww", "kkkkwwww", "kkkkwwww", "kkkwkwkw",
+      "kkkwwwww", "kkwwwwww", "kkwwwwww", ".kwwwwww", ".kwwwwww", "..kkkkkk", "...kYYkk", "....kk..",
+    ],
+  },
+  {
+    name: "เสือ",
+    rows: [
+      "..kkkk..", ".koookk.", "kkooookk", "koooookk", "koooookk", "koookwww", "koookwww", "koookwkw",
+      "koookwww", "koooowww", "kooooooo", "koookkkk", ".koooooo", ".koooooo", "..kkoooo", "....kkkk",
+    ],
+  },
+  {
+    name: "เต่า",
+    rows: [
+      "....kkkk", "...kgggg", "..kggggg", ".kggkggg", "kgggGggg", "kggggggg", "kggkgggg", "kggggggg",
+      "kggggGgg", "kggggggg", ".kgggggg", "..kggggg", "...kggkk", "...kkkww", "....kwwk", "....kkkk",
+    ],
+  },
+  {
+    name: "สุนัข",
+    rows: [
+      "..kk....", ".knkk...", "kNNnn...", "kNNnnkkk", "kNNnnnnn", "kNNnnnnn", "kNNknnnn", "kNNknnnn",
+      "knnnnnnn", "knnnnkkk", ".knnnnkk", ".knssskk", "..kssk..", "..knnn..", "...knn..", "....kk..",
     ],
   },
 ];
@@ -733,7 +775,7 @@ export function Icon({ name, size = 20, className = "", label, accent }) {
 export const AVATAR_COUNT = AVATAR_ART.length;
 export const AVATAR_NAMES = AVATAR_ART.map((a) => a.name);
 
-// อวตาร 16×16 · index 0–5 ตรงกับค่า avatar ที่ส่งไป server (events.md)
+// อวตารพิกเซล · index 0–11 ตรงกับค่า avatar ที่ส่งไป server (events.md)
 export function AvatarArt({ index = 0, size = 40, label }) {
   const safe = Number.isInteger(index) && index >= 0 && index < AVATAR_COUNT ? index : 0;
   return <Pix rows={AVATAR_ART[safe].rows} mirror size={size} className="avatar-art" label={label} />;

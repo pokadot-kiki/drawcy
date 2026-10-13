@@ -2962,6 +2962,22 @@ async function main() {
     checkOk("ข้อความ error ไม่สะท้อนคำที่ถูกปฏิเสธ", solo && !/sh!t/i.test(solo.message));
     host.socket.disconnect(); guest.socket.disconnect();
   });
+  await runPart("42. อวตารทั้ง 12 แบบผ่านตั้งแต่สร้างห้อง และเลขผิดใช้ตัวแรก", async () => {
+    const received = [];
+    for (let avatar = 0; avatar < 12; avatar++) {
+      const P = track(await connect());
+      const made = await emitAck(P.socket, "create_room", { name: `Avatar${avatar}`, avatar });
+      const room = await P.wait("room_update", (state) => state.code === made.code, 1500);
+      received.push(room.players[0].avatar);
+      P.socket.disconnect();
+    }
+    const invalid = track(await connect());
+    const made = await emitAck(invalid.socket, "create_room", { name: "AvatarBad", avatar: 12 });
+    const room = await invalid.wait("room_update", (state) => state.code === made.code, 1500);
+    check("server รองรับอวตาร 0 ถึง 11 ครบ", received, Array.from({ length: 12 }, (_, i) => i));
+    check("เลขอวตารเกินขอบเขตกลับไปตัวแรก", room.players[0].avatar, 0);
+    invalid.socket.disconnect();
+  });
 }
 
 

@@ -29,7 +29,7 @@
 {
   id: "9f2c41ab07d3e5a18c60", // playerId ถาวร (ไม่ใช่ socket.id แล้ว) ดูหัวข้อ "ตัวตนผู้เล่น" ข้างล่าง
   name: "mh",
-  avatar: 3,           // เลขอวตาร 0-5 ตามหน้า Lobby
+  avatar: 3,           // เลขอวตาร 0-11 ตามหน้า Lobby
   score: 0,
   isHost: true,
   team: null,          // "A" | "B" | null (ใช้เฉพาะ Team Mode)
@@ -810,3 +810,4 @@ server เรียก `saveScore` เองตอนจบ client ส่งค�
 | 3 ต.ค. | mh | ย้ายโหมดแข่งกับ AI ไปหน้า SET UP · Leaderboard เต็มในการ์ดหน้าแรก · ฟอนต์หัวข้อ Press Start 2P · ย้ายกล่องคำตอบ Solo ไปคอลัมน์ขวา (หน้าจอ ไม่แตะสัญญา) · แก้ชื่อผู้แก้ในไฟล์นี้เป็น `mh` |
 | 14 ต.ค. | mh | เพิ่ม `nameOwnerKey` ใน create/join/Solo: client สุ่ม 128 บิตเก็บ localStorage · server เก็บ hash ใน record คะแนนและไม่ส่ง hash ออก · เพิ่ม `NAME_OWNED` |
 | 14 ต.ค. | mh | เพิ่มการตรวจชื่อไม่สุภาพที่ server ทุกเส้นทางชื่อ · normalize ตัวพิมพ์ สัญลักษณ์ ตัวเลขแทนตัวอักษร และอักษรซ้ำ · เพิ่ม `NAME_NOT_ALLOWED` |
+| 14 ต.ค. | mh | เพิ่มอวตารสัตว์พิกเซล 6 แบบ (avatar 0–11) · เลือกได้จากตารางภาพใน Lobby, SET UP และกล่องเข้าห้อง · server แทนเลขนอกช่วงด้วย 0 เหมือนเดิม |

@@ -229,6 +229,7 @@ export default function App() {
         <SetUp
           connected={connected}
           profile={profile}
+          onProfile={setProfile}
           onBack={goHome}
           onEntered={handleEntered}
           onError={(code) => showToast(errorText(code))}

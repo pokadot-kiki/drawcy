@@ -179,10 +179,10 @@ function makeRoomCode() {
   return code;
 }
 
-// เลขอวตารต้องเป็นจำนวนเต็ม 0-5 ตาม events.md ค่าอื่นที่ไม่ถูกต้องใช้ 0 แทน (ไม่ต้องแจ้ง error)
+// เลขอวตารต้องเป็นจำนวนเต็ม 0-11 ตาม events.md ค่าอื่นที่ไม่ถูกต้องใช้ 0 แทน (ไม่ต้องแจ้ง error)
 function cleanAvatar(value) {
   const n = Number(value);
-  return Number.isInteger(n) && n >= 0 && n <= 5 ? n : 0;
+  return Number.isInteger(n) && n >= 0 && n <= 11 ? n : 0;
 }
 
 function roomState(room) {

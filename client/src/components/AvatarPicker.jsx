@@ -1,21 +1,26 @@
 import { AVATARS } from "../avatars";
-import { AvatarArt, Icon } from "./Icons";
+import { AvatarArt } from "./Icons";
 
-// อวตารใหญ่ตรงกลาง มีลูกศรซ้ายขวาเปลี่ยนตัววนไปเรื่อยๆ (ค่า 0-5 ตรงกับ avatar ใน events.md)
-export default function AvatarPicker({ value, onChange }) {
-  const n = AVATARS.length;
-  const step = (d) => onChange((value + d + n) % n);
+// เลือกจากภาพทั้ง 12 แบบได้ทันที เพื่อไม่ต้องกดวนทีละตัว
+export default function AvatarPicker({ value = 0, onChange, compact = false }) {
   return (
-    <div className="avatar-picker" role="group" aria-label="เลือกอวตาร">
-      <button type="button" className="avatar-picker__arrow" onClick={() => step(-1)} aria-label="อวตารก่อนหน้า">
-        <Icon name="arrowL" size={18} />
-      </button>
-      <div className="avatar-picker__stage" aria-live="polite">
-        <AvatarArt index={value} size={112} label={`อวตาร ${AVATARS[value]}`} />
+    <div className={`avatar-picker${compact ? " avatar-picker--compact" : ""}`} role="group" aria-label="เลือกอวตาร">
+      {!compact && <div className="avatar-picker__stage"><AvatarArt index={value} size={76} label={`อวตาร ${AVATARS[value]}`} /></div>}
+      <div className="avatar-picker__grid">
+        {AVATARS.map((name, index) => (
+          <button
+            key={name}
+            type="button"
+            className={`avatar-picker__choice${value === index ? " avatar-picker__choice--selected" : ""}`}
+            onClick={() => onChange(index)}
+            aria-label={`เลือกอวตาร ${name}`}
+            aria-pressed={value === index}
+            title={name}
+          >
+            <AvatarArt index={index} size={30} />
+          </button>
+        ))}
       </div>
-      <button type="button" className="avatar-picker__arrow" onClick={() => step(1)} aria-label="อวตารถัดไป">
-        <Icon name="arrowR" size={18} />
-      </button>
     </div>
   );
 }

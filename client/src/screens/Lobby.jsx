@@ -107,7 +107,7 @@ export default function Lobby({
         <OpenRooms disabled={!connected || busy} onJoin={join} />
       </div>
 
-      {joining && <JoinModal initialCode={inviteCode ?? ""} busy={busy} onSubmit={join} onClose={() => setJoining(false)} />}
+      {joining && <JoinModal initialCode={inviteCode ?? ""} busy={busy} onSubmit={join} onClose={() => setJoining(false)} avatar={profile.avatar} onAvatarChange={(avatar) => onProfile({ ...profile, avatar })} />}
     </div>
   );
 }
