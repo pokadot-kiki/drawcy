@@ -104,9 +104,13 @@ input {
 
 .logo {
   margin: 0;
-  display: grid;
-  gap: 10px; /* Press Start 2P ตัวสูง เพิ่มช่องว่างระหว่างสองบรรทัดไม่ให้ขอบเงาชนกัน */
-  justify-items: center;
+  /* บรรทัดเดียว (เดิม grid สองบรรทัด DRAW / .CY) · gap 0 เพราะฟอนต์มีระยะตัวอักษรในตัวอยู่แล้ว
+     และขอบดำรอบตัวอักษรชนกันได้ ไม่มีช่องว่างให้เห็น */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0;
   /* หัวข้อ "DRAW.CY" ใช้ฟอนต์พิกเซล Press Start 2P (เฉพาะโลโก้ ที่อื่นใช้ฟอนต์เดิม)
      ฟอนต์นี้ตัวกว้างมาก จึงลดขนาดและช่องไฟลง ไม่ให้ "DRAW IT" (7 ตัว) ล้นจอมือถือ */
   font-family: "Press Start 2P", var(--font-pixel);
@@ -3057,6 +3061,11 @@ select[class] {
 @media (max-height: 820px) {
   .screen--home .logo {
     font-size: 38px;
+  }
+
+  /* โลโก้เหลือบรรทัดเดียวแล้ว (ข้อ 6) เหลืออีก 2px ก็พอดีจอ 1366×768 — ตัดขอบล่างทิ้งเท่านั้น */
+  .screen--home {
+    padding-bottom: 16px;
   }
 
   .avatar-picker__stage {
