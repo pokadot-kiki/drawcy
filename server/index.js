@@ -7,7 +7,7 @@ const os = require("os");
 const crypto = require("crypto");
 const path = require("path");
 const { Server } = require("socket.io");
-const { cleanName } = require("./clean");
+const { cleanName, isNameAllowed } = require("./clean");
 const { hashOwnerKey } = require("./name-ownership");
 const leaderboard = require("./leaderboard");
 const ai = require("./ai");
@@ -1439,6 +1439,7 @@ io.on("connection", (socket) => {
     if (typeof callback !== "function") return;
     const name = cleanName(data?.name);
     if (!name) return callback({ ok: false, error: "INVALID_NAME" });
+    if (!isNameAllowed(name)) return callback({ ok: false, error: "NAME_NOT_ALLOWED" });
     const nameError = nameOwnerOk(socket, name, data?.nameOwnerKey);
     if (nameError) return callback({ ok: false, error: nameError });
 
@@ -1475,6 +1476,7 @@ io.on("connection", (socket) => {
 
     if (!name) return callback({ ok: false, error: "INVALID_NAME" });
     if (!room) return callback({ ok: false, error: "ROOM_NOT_FOUND" });
+    if (!isNameAllowed(name)) return callback({ ok: false, error: "NAME_NOT_ALLOWED" });
     const nameError = nameOwnerOk(socket, name, data?.nameOwnerKey);
     if (nameError) return callback({ ok: false, error: nameError });
     // เป็นสมาชิกห้องนี้อยู่แล้ว (เช่นรีเฟรชแล้วกดเข้าห้องเดิมภายในเวลารอ) = กลับเข้าที่เดิม ไม่สร้างผู้เล่นซ้ำ
@@ -1809,6 +1811,7 @@ io.on("connection", (socket) => {
   socket.on("ai_start", (data) => {
     const name = cleanName(data?.name);
     if (!name) return socket.emit("game_error", { code: "INVALID_NAME", message: "กรุณาใส่ชื่อ" });
+    if (!isNameAllowed(name)) return socket.emit("game_error", { code: "NAME_NOT_ALLOWED", message: "ชื่อนี้ไม่เหมาะสม ลองชื่ออื่นนะ" });
     const nameError = nameOwnerOk(socket, name, data?.nameOwnerKey);
     if (nameError) return socket.emit("game_error", { code: nameError, message: nameError === "NAME_OWNED" ? "ชื่อนี้มีเจ้าของแล้ว ลองชื่ออื่นนะ" : "ลองใหม่อีกครั้งในอีกสักครู่" });
     leaveRoom(socket); // ผู้เล่นหนึ่งคนอยู่ได้อย่างเดียว: ห้อง หรือ Solo

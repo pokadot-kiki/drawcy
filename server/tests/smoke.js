@@ -2933,6 +2933,35 @@ async function main() {
     check("ข้อมูลคะแนนเก่าที่ไม่มี ownerHash ยังใช้ชื่อได้", lb.canUseName([{ name: "Legacy", score: 10, playedAt: "2026-01-01 00:00" }], "legacy", keyB), true);
     for (const rec of [ownerHost, other, guest]) rec.socket.disconnect();
   });
+  await runPart("41. ตรวจชื่อไม่สุภาพทุกทาง และยุบตัวอักษรหลบเลี่ยง", async () => {
+    const { isNameAllowed } = require("../clean");
+    const passNames = ["peacock", "Cocktail", "Scunthorpe", "ฟักทอง", "สาธิต"];
+    const blockedNames = ["ค-ว-ย", "เหี้้ย", "f.u.c.k", "sh!t", "b1tch"];
+    check("ชื่อปกติที่มีตัวอักษรทับซ้อนผ่านได้", passNames.every(isNameAllowed), true);
+    check("จับคำไทย/อังกฤษเมื่อคั่นสัญลักษณ์หรือย้ำวรรณยุกต์", blockedNames.every((name) => !isNameAllowed(name)), true);
+
+    const source = fs.readFileSync(path.join(SERVER_DIR, "..", "client", "src", "playerName.js"), "utf8");
+    const readList = (name) => {
+      const body = source.match(new RegExp(`const ${name} = \\[([\\s\\S]*?)\\]`))?.[1] ?? "";
+      return [...body.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    };
+    const generated = readList("ANIMALS").flatMap((animal) => readList("CUTE_WORDS").map((word) => animal + word));
+    check("ชื่ออัตโนมัติทุกคู่จากคลังผ่านกฎเดียวกัน", generated.length === 400 && generated.every(isNameAllowed), true);
+
+    const host = track(await connect());
+    const rejectedCreate = await emitAck(host.socket, "create_room", { name: "f.u.c.k", avatar: 0 });
+    check("create_room ปฏิเสธชื่อไม่เหมาะสม", rejectedCreate?.error, "NAME_NOT_ALLOWED");
+    const room = await emitAck(host.socket, "create_room", { name: "SafeHost", avatar: 0 });
+    const guest = track(await connect());
+    const rejectedJoin = await emitAck(guest.socket, "join_room", { code: room.code, name: "ค-ว-ย", avatar: 0 });
+    check("join_room ปฏิเสธชื่อไม่เหมาะสม", rejectedJoin?.error, "NAME_NOT_ALLOWED");
+    guest.clear();
+    guest.socket.emit("ai_start", { name: "sh!t" });
+    const solo = await guest.wait("game_error", (e) => e.code === "NAME_NOT_ALLOWED", 1500).catch(() => null);
+    check("Solo ปฏิเสธชื่อไม่เหมาะสมก่อนเริ่ม", solo?.code, "NAME_NOT_ALLOWED");
+    checkOk("ข้อความ error ไม่สะท้อนคำที่ถูกปฏิเสธ", solo && !/sh!t/i.test(solo.message));
+    host.socket.disconnect(); guest.socket.disconnect();
+  });
 }
 
 

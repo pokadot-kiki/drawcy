@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { socket } from "../socket";
 import { nameOwnerKey } from "../nameOwnerKey";
+import { isNameAllowed } from "../nameRules";
 import Logo from "../components/Logo";
 import Timer from "../components/Timer";
 import Canvas from "../components/Canvas";
@@ -62,6 +63,7 @@ export default function SoloAI({ initialName = "", boot = null, onName, onBack }
   // watch = ช่วง 2 ดูภาพที่เล่นซ้ำแล้วพิมพ์ทาย · rest = พักระหว่างช่วง · over = จบเกม
   const [phase, setPhase] = useState("intro");
   const [name, setName] = useState(initialName);
+  const [nameWarning, setNameWarning] = useState("");
   // ระดับความยากของ "ชุดคำ" ทั้งเกม (เวลายังสั้นลงตามด่านเหมือนเดิม) — server เป็นคนสุ่มคำตามระดับนี้
   // มาจากหน้า SET UP (boot) ถ้าเข้าทางนั้น ไม่งั้นเริ่มที่ง่าย
   const [difficulty, setDifficulty] = useState(boot?.difficulty ?? "easy");
@@ -261,6 +263,10 @@ export default function SoloAI({ initialName = "", boot = null, onName, onBack }
   // ส่งเฉพาะตอนยังอยู่หน้ากรอกชื่อ กันยิงซ้ำถ้า component re-render
   useEffect(() => {
     if (!boot || phaseRef.current !== "intro") return;
+    if (!isNameAllowed(initialName)) {
+      setNameWarning("ชื่อนี้ไม่เหมาะสม ลองชื่ออื่นนะ");
+      return;
+    }
     onName?.(initialName.trim());
     setScore(0);
     setLives(3);
@@ -320,6 +326,8 @@ export default function SoloAI({ initialName = "", boot = null, onName, onBack }
   function start(e) {
     e?.preventDefault();
     if (!name.trim()) return;
+    if (!isNameAllowed(name)) return setNameWarning("ชื่อนี้ไม่เหมาะสม ลองชื่ออื่นนะ");
+    setNameWarning("");
     onName?.(name.trim()); // จำชื่อที่ใช้ไว้ (ชื่อเดียวกับหน้าแรก)
     setScore(0);
     setLives(3);
@@ -409,12 +417,13 @@ export default function SoloAI({ initialName = "", boot = null, onName, onBack }
             id="solo-name"
             className="input"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => { setName(e.target.value); setNameWarning(isNameAllowed(e.target.value) ? "" : "ชื่อนี้ไม่เหมาะสม ลองชื่ออื่นนะ"); }}
             maxLength={20}
             placeholder="ชื่อเล่นของคุณ"
             autoComplete="off"
             autoFocus
           />
+          {nameWarning && <small className="form-note form-note--error">{nameWarning}</small>}
           <small className="name-owner-note">ชื่อนี้ผูกกับเบราว์เซอร์เครื่องนี้ · ล้างข้อมูลหรือเปลี่ยนเครื่องอาจใช้ชื่อเดิมไม่ได้</small>
           <span className="field__label" id="solo-diff-label">
             ระดับความยากของคำ

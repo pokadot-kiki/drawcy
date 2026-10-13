@@ -2,6 +2,7 @@
 // ใส่ให้ตั้งแต่เปิดเว็บ ไม่ต้องพิมพ์ก็กดเล่นได้เลย · จำชื่อล่าสุดไว้ในเบราว์เซอร์ (เปิดครั้งหน้าใช้ชื่อเดิม)
 // คลัง 20 × 20 = 400 ชื่อ ล้วนเป็นคำน่ารักเป็นกลาง ไม่มีคำหยาบหรือคำล้อเลียนใคร
 // ความยาวทุกชื่อ ≤ 20 ตัวอักษร (เท่าเพดานของ server — cleanName) มีสคริปต์เทสตอนพัฒนายืนยันแล้ว
+import { isNameAllowed } from "./nameRules";
 
 const ANIMALS = [
   "แมว", "เพนกวิน", "หมี", "กระต่าย", "แพนด้า", "เป็ด", "หมูน้อย", "ช้างน้อย", "กบ", "ปลาหมึก",
@@ -16,9 +17,10 @@ const CUTE_WORDS = [
 const KEY = "jdi.name";
 const MAX_LEN = 20; // = cleanName ฝั่ง server
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
+const SAFE_NAME_PAIRS = ANIMALS.flatMap((animal) => CUTE_WORDS.map((word) => animal + word)).filter(isNameAllowed);
 
 export function randomName() {
-  return pick(ANIMALS) + pick(CUTE_WORDS);
+  return pick(SAFE_NAME_PAIRS);
 }
 
 // ชื่อที่จำไว้ครั้งล่าสุด (ไม่มี/อ่านไม่ได้ = null)

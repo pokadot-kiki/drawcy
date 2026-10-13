@@ -809,3 +809,4 @@ server เรียก `saveScore` เองตอนจบ client ส่งค�
 | 3 ต.ค. | mh | **Ready + เตะออก** — `Player.ready` · event ใหม่ `set_ready` · `kick_player` (หัวห้องเท่านั้น) · `kicked` (คนถูกเตะกลับหน้าแรก rejoin ไม่ดึงกลับ) |
 | 3 ต.ค. | mh | ย้ายโหมดแข่งกับ AI ไปหน้า SET UP · Leaderboard เต็มในการ์ดหน้าแรก · ฟอนต์หัวข้อ Press Start 2P · ย้ายกล่องคำตอบ Solo ไปคอลัมน์ขวา (หน้าจอ ไม่แตะสัญญา) · แก้ชื่อผู้แก้ในไฟล์นี้เป็น `mh` |
 | 14 ต.ค. | mh | เพิ่ม `nameOwnerKey` ใน create/join/Solo: client สุ่ม 128 บิตเก็บ localStorage · server เก็บ hash ใน record คะแนนและไม่ส่ง hash ออก · เพิ่ม `NAME_OWNED` |
+| 14 ต.ค. | mh | เพิ่มการตรวจชื่อไม่สุภาพที่ server ทุกเส้นทางชื่อ · normalize ตัวพิมพ์ สัญลักษณ์ ตัวเลขแทนตัวอักษร และอักษรซ้ำ · เพิ่ม `NAME_NOT_ALLOWED` |

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { socket } from "../socket";
 import { withSuffix } from "../playerName";
 import { nameOwnerKey } from "../nameOwnerKey";
+import { isNameAllowed } from "../nameRules";
 
 // สร้างห้อง / เข้าห้อง ผ่าน socket (ใช้ร่วมกันระหว่างหน้า SET UP กับกล่องใส่รหัสห้อง)
 // ฝั่งนี้แค่ช่วยให้ใช้ง่าย ของจริง server เป็นคนตรวจซ้ำเสมอ (server-authoritative)
@@ -11,6 +12,7 @@ export function useEnterRoom({ connected, onEntered, onError }) {
   // event = "create_room" | "join_room" · payload ตามหน้าตาใน events.md §1
   function enter(event, payload, { name, avatar }, retried = false) {
     if (!retried && (busy || !connected)) return;
+    if (!isNameAllowed(payload?.name)) return onError("NAME_NOT_ALLOWED");
     setBusy(true);
 
     // กันตอบซ้ำ: ถ้า server ไม่ตอบใน 6 วิ (เช่นลืมเปิด server) ให้ปลดล็อกปุ่มแล้วบอกผู้ใช้
