@@ -3204,6 +3204,64 @@ async function main() {
     for (const rec of [ownerHost, other, guest]) rec.socket.disconnect();
   });
 
+  await runPart("40.1 เจ้าของชื่อ: ชื่อที่ตาเห็นเหมือนกันแต่อักขระข้างในต่าง ต้องโดนกันทุกทาง", async () => {
+    // รูรั่วเดิม: เทียบชื่อแค่ตัดช่องว่างหัวท้าย + ตัวเล็ก → แทรกอักขระล่องหน / ใช้ตัวเต็มความกว้าง /
+    // สระอำแบบแยกตัว / ช่องว่างซ้อน ฯลฯ แล้วใช้ชื่อเจ้าของได้ และขึ้นกระดานเป็นแถวที่ตาเห็นว่าชื่อซ้ำกัน
+    const lb = require("../leaderboard");
+    const { normalizeOwnerName } = require("../name-ownership");
+    const keyA = "d".repeat(32), keyB = "e".repeat(32);
+    lb.saveScore({ name: "น้ำตาลแดง", score: 90, levelReached: 2, nameOwnerKey: keyA });
+    lb.saveScore({ name: "Mint Mint", score: 90, levelReached: 2, nameOwnerKey: keyA });
+    const variants = [
+      ["อักขระล่องหน zero-width", "น้ำ\u200bตาลแดง"],
+      ["word joiner ท้ายชื่อ", "Mint Mint\u2060"],
+      ["BOM + soft hyphen", "\ufeffMint\u00ad Mint"],
+      ["สระอำแยกเป็น นิคหิต+า", "น\u0e49\u0e4d\u0e32ตาลแดง"],
+      ["ช่องว่างซ้อนกลางชื่อ", "Mint   Mint"],
+      ["no-break space", "Mint\u00a0Mint"],
+      ["ตัวเต็มความกว้าง", "Ｍｉｎｔ Ｍｉｎｔ"],
+    ];
+    for (const [label, name] of variants) {
+      const B = track(await connect());
+      const c = await emitAck(B.socket, "create_room", { name, avatar: 0, nameOwnerKey: keyB });
+      check(`create_room ปฏิเสธ (${label})`, c?.error, "NAME_OWNED");
+      B.clear();
+      B.socket.emit("ai_start", { name, nameOwnerKey: keyB });
+      const e = await B.wait("game_error", (x) => x.code === "NAME_OWNED", 1500).catch(() => null);
+      check(`ai_start ปฏิเสธ (${label})`, e?.code, "NAME_OWNED");
+      check(`บันทึกคะแนนปฏิเสธ (${label})`, lb.saveScore({ name, score: 999, levelReached: 9, nameOwnerKey: keyB }), null);
+      B.socket.disconnect();
+    }
+    // join_room ด้วยชื่อหลบ (เจ้าของสร้างห้องไว้ด้วยชื่ออื่น)
+    const host = track(await connect());
+    const room = await emitAck(host.socket, "create_room", { name: "หัวห้องทดสอบ", avatar: 0, nameOwnerKey: keyA });
+    for (const name of ["Mint\u200b Mint", "Ｍｉｎｔ Ｍｉｎｔ"]) {
+      const B = track(await connect());
+      const j = await emitAck(B.socket, "join_room", { code: room.code, name, avatar: 1, nameOwnerKey: keyB });
+      check(`join_room ปฏิเสธ ${JSON.stringify(name)}`, j?.error, "NAME_OWNED");
+      B.socket.disconnect();
+    }
+    // rejoin ไม่รับชื่อ ผูกกับ playerKey → คนอื่นสวมที่นั่งของเจ้าของไม่ได้
+    const intruder = track(await connect());
+    const rj = await emitAck(intruder.socket, "rejoin", { code: room.code });
+    check("rejoin ห้องที่ตัวเองไม่ได้อยู่ = NOT_IN_ROOM", rj?.error, "NOT_IN_ROOM");
+    // เจ้าของตัวจริงยังใช้ชื่อตัวเองได้ทุกรูปแบบที่ตาเห็นเหมือนกัน
+    const owner = track(await connect());
+    const ok1 = await emitAck(owner.socket, "create_room", { name: "mint  mint", avatar: 0, nameOwnerKey: keyA });
+    checkOk("เจ้าของใช้ชื่อตัวเองได้ (ช่องว่างซ้อน/ตัวเล็ก)", ok1?.ok);
+    // ชื่อที่ต่างกันจริงต้องไม่ถูกนับเป็นชื่อเดียวกัน
+    check("ชื่อต่างกันจริงยังแยกกัน (กา/ก่า · Mint/Mind)", [normalizeOwnerName("กา") === normalizeOwnerName("ก่า"), normalizeOwnerName("Mint") === normalizeOwnerName("Mind")], [false, false]);
+    // แถวเก่าที่หลุดเข้ามาก่อนแก้ (ชื่อหลบ เป็นของ B) → เจ้าของที่บันทึกก่อนสุด (A) ยังชนะ
+    const rows = [
+      { id: 1, name: "Pear", score: 1, levelReached: 0, playedAt: "2026-01-01 00:00", ownerHash: require("../name-ownership").hashOwnerKey(keyA) },
+      { id: 2, name: "Pe\u200bar", score: 9, levelReached: 0, playedAt: "2026-01-02 00:00", ownerHash: require("../name-ownership").hashOwnerKey(keyB) },
+    ];
+    check("มีแถวหลบอยู่แล้ว: เจ้าของเดิม (id น้อยสุด) ชนะ", [lb.canUseName(rows, "Pear", keyA), lb.canUseName(rows, "Pe\u200bar", keyB)], [true, false]);
+    const json = JSON.stringify([host.dump(), owner.dump(), intruder.dump()]);
+    checkOk("event ไม่มีกุญแจหรือ hash เจ้าของชื่อ", ![keyA, keyB, "ownerHash"].some((v) => json.includes(v)));
+    for (const r of [host, owner, intruder]) r.socket.disconnect();
+  });
+
   await runPart("41. ตรวจชื่อไม่สุภาพทุกทาง และยุบตัวอักษรหลบเลี่ยง", async () => {
     const { isNameAllowed } = require("../clean");
     const passNames = ["peacock", "Cocktail", "Scunthorpe", "ฟักทอง", "สาธิต"];
