@@ -3292,8 +3292,9 @@ async function main() {
     const rejectedJoin = await emitAck(other.socket, "join_room", { code: created.code, name: "OwnerName", avatar: 0, nameOwnerKey: keyB });
     check("join_room ปฏิเสธชื่อที่มีเจ้าของ", rejectedJoin?.error, "NAME_OWNED");
     const guest = track(await connect());
-    const acceptedJoin = await emitAck(guest.socket, "join_room", { code: created.code, name: "ownername", avatar: 0, nameOwnerKey: keyA });
-    checkOk("เทียบชื่อแบบไม่สนตัวพิมพ์และเจ้าของเข้าห้องได้", acceptedJoin?.ok);
+    // ห้องเดียวกันมี "OwnerName" อยู่แล้ว → "ownername" ซ้ำในห้อง (NAME_TAKEN ตั้งแต่ bug-sweep ข้อ 1) จึงทดสอบด้วยการสร้างห้องใหม่
+    const acceptedJoin = await emitAck(guest.socket, "create_room", { name: "ownername", avatar: 0, nameOwnerKey: keyA });
+    checkOk("เทียบชื่อแบบไม่สนตัวพิมพ์ และเจ้าของใช้ชื่อตัวเองแบบต่างตัวพิมพ์ได้", acceptedJoin?.ok);
 
     other.clear();
     other.socket.emit("ai_start", { name: "OwnerName", nameOwnerKey: keyB });
