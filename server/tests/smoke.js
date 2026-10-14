@@ -3452,6 +3452,45 @@ async function main() {
     for (const r of [host, ok2]) r.socket.disconnect();
   });
 
+
+  await runPart("47. เคอร์เซอร์ไม่หาย (กัน Windows) — สแกน CSS/JS ฝั่ง client", async () => {
+    // กติกา: ห้าม cursor: none (เคอร์เซอร์หายทั้งจอถ้า JS วาดแทนไม่ทัน) · cursor: url(...) ต้องลงท้ายด้วยคีย์เวิร์ดสำรองเสมอ
+    // · ห้ามล็อกเมาส์ (requestPointerLock) · รูปเคอร์เซอร์ของกระดานต้อง ≤ 32px และมี crosshair สำรอง
+    const CLIENT_SRC = path.join(SERVER_DIR, "..", "client", "src");
+    const files = [];
+    const walk = (d) => { for (const f of fs.readdirSync(d, { withFileTypes: true })) {
+      const full = path.join(d, f.name);
+      if (f.isDirectory()) walk(full); else if (/\.(css|jsx?|html)$/.test(f.name) && !/\.test\.js$/.test(f.name)) files.push(full);
+    } };
+    walk(CLIENT_SRC);
+    files.push(path.join(SERVER_DIR, "..", "client", "index.html"));
+    const problems = [];
+    let urlCursors = 0;
+    for (const f of files) {
+      const text = fs.readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
+      const rel = path.relative(path.join(SERVER_DIR, ".."), f);
+      // ค่าใน CSS และ object style ของ React (cursor: "...") หรือกำหนดผ่าน JS (style.cursor = "...")
+      for (const m of text.matchAll(/cursor\s*[:=]\s*([^;}\n]+)/g)) {
+        const raw = m[1].trim().replace(/^["'`]|["'`],?$/g, "").trim();
+        if (/^none\b/i.test(raw)) problems.push(`${rel}: cursor: none`);
+        if (/url\(/i.test(raw)) {
+          urlCursors++;
+          const lastPart = raw.split(",").pop().trim().replace(/["'`;)]+$/, "");
+          if (!/^[a-z-]+$/.test(lastPart) || lastPart === "none") problems.push(`${rel}: cursor url ไม่มีคีย์เวิร์ดสำรอง (${raw.slice(0, 60)})`);
+        }
+      }
+      if (/requestPointerLock/.test(text)) problems.push(`${rel}: requestPointerLock`);
+    }
+    check("ไม่มี cursor: none / url() ไม่มีสำรอง / ล็อกเมาส์ ในฝั่ง client", problems, []);
+    checkOk(`สแกนไฟล์ client ครบ (${files.length} ไฟล์)`, files.length > 20);
+    const cursorJs = fs.readFileSync(path.join(CLIENT_SRC, "canvas", "cursor.js"), "utf8");
+    checkOk("canvas/cursor.js: เพดานรูป 32px และต่อท้าย crosshair ทุกครั้ง (catch ก็คืน crosshair)",
+      /CURSOR_MAX = 32\b/.test(cursorJs) && /FALLBACK = "crosshair"/.test(cursorJs) && cursorJs.includes(", ${FALLBACK}`") && /catch \{\s*return FALLBACK/.test(cursorJs));
+    const canvasJsx = fs.readFileSync(path.join(CLIENT_SRC, "components", "Canvas.jsx"), "utf8");
+    checkOk("กระดานใช้ boardCursor เฉพาะตอนวาดได้ (ตอนวาดไม่ได้ = เคอร์เซอร์ปกติของระบบ)",
+      /style=\{canDraw \? \{ cursor: boardCursor\(tool, size, color\) \} : undefined\}/.test(canvasJsx));
+  });
+
   await runPart("40.4 อวตารใน Leaderboard: เก็บพร้อมคะแนน · ส่งใน API · แถวเก่า = 0 · เจ้าของชื่อไม่เสีย", async () => {
     const lb = require("../leaderboard");
     const keyA = "7".repeat(32), keyB = "8".repeat(32);

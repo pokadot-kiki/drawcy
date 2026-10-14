@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { createPainter, strokeShape } from "../canvas/painter";
 import { beginStroke, extendStroke, endStroke, applyFill, clearBoard, drawShape } from "../canvas/actions";
 import { TOOLS, isShapeTool } from "../canvas/palette";
+import { boardCursor } from "../canvas/cursor";
 import { reduceMotion } from "../prefs";
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -696,7 +697,13 @@ const Canvas = forwardRef(function Canvas({ canDraw, tool, color, size, onAction
   }
 
   return (
-    <div className={`board${canDraw ? " board--draw" : ""}`} ref={wrapRef}>
+    // วาดได้ = เคอร์เซอร์ของเราเอง (วงกลมตามขนาดแปรง/ถังสี/กากบาท) ขอบดำ+ขาว เห็นชัดทุกพื้น ต่อท้าย crosshair เป็นสำรอง (ดู canvas/cursor.js)
+    // วาดไม่ได้ (ไม่ใช่ตาเรา · ยกปากกาแล้ว · ช่วงป้ายใหญ่) = ไม่ตั้ง ใช้เคอร์เซอร์ปกติของระบบ
+    <div
+      className={`board${canDraw ? " board--draw" : ""}`}
+      ref={wrapRef}
+      style={canDraw ? { cursor: boardCursor(tool, size, color) } : undefined}
+    >
       <canvas
         ref={canvasRef}
         className="board__canvas"
