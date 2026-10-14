@@ -151,3 +151,6 @@ vite.config.ts.timestamp-*
 server/models/
 screenshots-*/
 .DS_Store
+
+# ไฟล์ session ชั่วคราวจากเครื่องมือ (ชื่อขึ้นต้น :memory:) — ไม่ใช่ของโปรเจกต์ ห้ามขึ้น git
+:memory:.ses*
