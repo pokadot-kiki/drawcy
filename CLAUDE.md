@@ -23,12 +23,12 @@ DRAW.CY (เดิมชื่อ Just Drawit · ชื่อทีม TATA.IO) 
 
 1. เกมพื้นฐาน เล่นได้หลายห้องพร้อมกัน ห้องไม่ปนกัน
 2. ถังสีสำหรับระบายสี (อาจารย์ขอ)
-3. Leaderboard ชื่อเล่น คะแนน อันดับรายเดือน (อาจารย์ขอ) เก็บเป็นไฟล์ JSON
+3. Leaderboard ชื่อเล่น คะแนน อันดับรายเดือน (อาจารย์ขอ) เก็บใน Upstash Redis เมื่อตั้ง env (ใช้บน Render) ไม่ตั้ง = ไฟล์ JSON `server/data/scores.json`
 4. Solo แข่งกับ AI สุ่มคำ ผู้เล่นวาด AI ทาย ยากขึ้นเรื่อยๆ (อาจารย์ขอ)
-5. Mini Challenge สองแบบ คือ Colour Fix (ใช้ได้สีเดียว) และ Don't Lift Pen (ห้ามยกปากกา)
+5. Mini Challenge สามแบบ คือ Colour Fix (ใช้ได้สีเดียว) · Don't Lift Pen (ห้ามยกปากกา) · Shapes Only (วาดได้แต่รูปทรง) · หัวห้องเปิด/ปิดทีละใบในห้องรอ (`set_challenges` ดู `events.md` หัวข้อ 5)
 
 **โหมดทีม (Team Mode) เอากลับมาแล้ว** (ทำครบทั้ง server และหน้าจอ ดูหัวข้อ 8 ใน `events.md`)
-**ตัดออกแล้ว ห้ามทำ** Geometric Shapes Only (เป็นแผนต่อยอดในสไลด์)
+~~**ตัดออกแล้ว ห้ามทำ** Geometric Shapes Only~~ **ถูกแทนที่แล้ว**: Shapes Only (`shapes_only`) กลับมาและใช้งานจริง (server + หน้าจอ + เทส) — ดู `events.md` หัวข้อ 5
 
 ## Tech stack
 
@@ -36,7 +36,7 @@ DRAW.CY (เดิมชื่อ Just Drawit · ชื่อทีม TATA.IO) 
 |---|---|
 | server | Node.js + Express + Socket.IO (CommonJS, `require`) พอร์ต 3000 |
 | client | React + Vite, `react-router-dom` (URL ต่อหน้า), CSS ธรรมดา (ไม่ใช้ Tailwind), HTML5 Canvas, `socket.io-client` |
-| เก็บคะแนน | ไฟล์ `server/data/scores.json` (ไม่ใช้ database เพื่อให้ทันเวลา) |
+| เก็บคะแนน | **Upstash Redis** (คีย์ `jdi:scores:v1`) เมื่อตั้ง `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (ใช้บน Render ดู `DEPLOY.md`) · ไม่ตั้ง env หรือต่อไม่ได้ = ไฟล์ `server/data/scores.json` แทนอัตโนมัติ ไม่ล่ม (`server/leaderboard.js`) |
 | AI ทายภาพ | ลำดับ **โมเดลในเครื่อง** (Quick, Draw! MobileViT ผ่าน `onnxruntime-node` + `sharp` แปลงภาพ) → Claude (vision) เรียกจาก server เท่านั้น ผ่าน `fetch` ของ Node (ไม่ใช้ SDK) key อยู่ใน `server/.env` → โหมดจำลอง |
 
 ห้ามเพิ่ม library ใหม่โดยไม่บอกผู้ใช้ก่อนว่าคืออะไร ทำไมต้องใช้
@@ -53,7 +53,7 @@ justdrawit/
 │  ├─ ai.js             ← AI ทายภาพ (โมเดล/Claude/จำลอง) · กติกาด่าน · สุ่มคำ · คิดคะแนน Solo ไม่ผูกกับ socket
 │  ├─ .env.example      ← ตัวอย่างไฟล์ .env (คัดลอกเป็น .env แล้วใส่ ANTHROPIC_API_KEY)
 │  ├─ index.js          ← server หลัก (ทำไว้แล้ว ดู "สถานะงาน")
-│  ├─ leaderboard.js    ← อ่าน/บันทึก scores.json (`saveScore` `getLeaderboard`) ไม่ผูกกับ socket
+│  ├─ leaderboard.js    ← คะแนนบน Upstash Redis เมื่อมี env ไม่มีใช้ scores.json (`saveScore` `getLeaderboard`) ไม่ผูกกับ socket
 │  ├─ clean.js          ← `cleanName` ใช้ร่วมกันระหว่าง index.js กับ leaderboard.js
 │  ├─ teams.js          ← `computeBalancedTeams` จัดทีมให้สมดุล (ฟังก์ชันล้วน ไม่ผูกกับ socket)
 │  ├─ scripts/seed-scores.js ← ใส่คะแนนตัวอย่าง (`npm run seed`)
@@ -534,7 +534,7 @@ selector ระดับเดียวกัน ตัวที่อยู่�
 แก้เทสให้เดินต่อในตาที่ 2 แทน (ซึ่งได้ผลพลอยได้: ยืนยันด้วยว่า**ขึ้นตาใหม่แล้วคนวาดเปลี่ยนคนจริง**และปุ่มย้ายไปหาเจ้าของใหม่)
 
 ### เสร็จแล้ว (ข้อ 5 — Mini Challenge: Colour Fix และ Don't Lift Pen)
-`shapes_only` ตัดออกตามที่ตกลง **ไม่มีการสุ่มขึ้นมาเลย** (มีเทสกันไว้แล้ว)
+~~`shapes_only` ตัดออกตามที่ตกลง **ไม่มีการสุ่มขึ้นมาเลย**~~ **ถูกแทนที่แล้ว** — Shapes Only กลับมาใช้งานจริงภายหลัง (ดู `events.md` หัวข้อ 5)
 
 **สัญญากลางถูกแก้ในข้อนี้ 2 ครั้ง** (`events.md` §5 + 3 บรรทัดใหม่ในตาราง "บันทึกการแก้ไข") — ผู้ใช้รับทราบแล้ว
 1. เพิ่ม `challenge` ใน `round_start` (และใน `roundInfo` ด้วย เพื่อให้คนเข้าห้องกลางตาเห็นเหมือนกัน)
@@ -971,6 +971,17 @@ server แยกฟังก์ชัน `applySettings(room, data)` ใช้�
 - **client** (`SoloAI.jsx`): `sessionStorage` `jdi.soloActive` (มีเกมค้าง) + `jdi.soloCanvas` (action ของกระดานช่วง 1 ผูก `ด่าน|คำ` เก็บทุกครั้งที่จบเส้น/เทสี/รูปทรง/ล้างจอ/ย้อน/ทำซ้ำ · try/catch อ่านไม่ได้ = กระดานว่าง) · เปิด /solo มีเกมค้าง → phase `resuming` → `ai_resume` → แสดงเกมเดิมต่อทันที (ไม่ต้องกด START) · นับเวลาต่อจากเวลาที่เหลือ (`stage.left`) · ไม่มีเกมแล้ว → หน้ากรอกชื่อ + "เกมเดิมจบไปแล้ว (หลุดนานเกินไป)"
 - ทดสอบ: `npm test` 738/738 (smoke ข้อ 39.5: resume ช่วง 1/2/พัก · ตัวจับเวลาเดิมส่งถึง socket ใหม่ · กุญแจอื่น/ไม่มีกุญแจ = NOT_IN_GAME และไม่ได้ event ของเรา · ไม่มีคำตอบรั่ว · หลุดเกินเวลา/กดออก = ไม่บันทึก · เริ่มใหม่ทับเกมค้าง · รันจากสำเนาพอร์ต 3040/3041) · เบราว์เซอร์จริงทุกกรณีก่อน/หลังแก้ (ภาพ/คำ/เวลา/ด่าน/ชีวิต/คะแนน/คำเดา คืนครบ) + เกินเวลารอ (REJOIN_GRACE_MS=1500 ของเทส) เห็นหน้ากรอกชื่อพร้อมข้อความ · ชุดเทียบ 60 วิ ต่อเกมได้
 - **ข้อจำกัด**: เส้นที่กำลังลากค้างตอนกดรีเฟรชหาย (เก็บตอนจบเส้น) · เวลาด่านเดินต่อระหว่างรีเฟรช (ปกติ 2–3 วิ) · ปิดแท็บแล้วเปิดใหม่ = playerKey ใหม่ ต่อเกมเดิมไม่ได้ (sessionStorage เป็นของแท็บ) · ภาพช่วง 2 หลังรีเฟรชวาดคืนทั้งเส้นทันที หมึกต่างจากตอนไล่จุดราว 1–2% · ห้องปกติรีเฟรชแล้วแชทเก่าไม่คืน (ของเดิม ไม่ได้แก้) · เกมจบตามกติการะหว่างที่หลุดอยู่ = บันทึกคะแนน (เกมจบจริง) ทดสอบแค่จากโค้ด ไม่มีเทสอัตโนมัติ (ต้องเสียครบ 3 ชีวิตภายในเวลารอ)
+
+### เสร็จแล้ว (ไล่หาบั๊กก่อนนำเสนอ — branch `bug-sweep` จาก `fix-refresh` · แตะ server + client + `events.md` + เอกสาร)
+- **รอบที่ 1 ตรวจ** (socket หลายผู้เล่น + Chrome จริงหลายโปรไฟล์ · server ทดสอบพอร์ต 305x/306x · SCORES_FILE ชั่วคราว · AI_MODE=mock และโมเดลจริง): ห้องเดี่ยว 2/3/8 คน · ทีม 2/3/4 ทีม · Solo ทุกระดับ/รีเฟรช/โมเดลจริง (ภาพวงกลม → "วงกลม") · Mini Challenge ทั้ง 3 แบบ · ชื่อไม่สุภาพ/HTML/อวตาร 12 แบบ · ความปลอดภัย (คำตอบไม่หลุด · fuzz 26 event × 22 แบบไม่ล่ม · rate limit · key/hash ไม่รั่ว) · หลุด/กลับทุกจังหวะ · 9 หน้า × 6 ขนาดไม่ล้นแนวนอน · deploy (healthz · FORCE_HTTPS · HOST · ถอยจาก Upstash · `npm run setup` จากโฟลเดอร์สะอาด · ไม่มีความลับในประวัติ) — **ไม่พบบั๊กทำเกมพัง**
+- **รอบที่ 2 แก้ (ผู้ใช้เลือก 1 2 3 4 5 7 · ข้อ 6 คำเตือน AudioContext ปล่อยไว้)**:
+  1. `NAME_TAKEN` เทียบแบบเดียวกับเจ้าของชื่อ (`normalizeOwnerName`) — "Tar"/"tar"/แทรกอักขระล่องหน ซ้ำกัน · smoke 40.3
+  2. อวตารในสรุปตา · จบเกม (หาจากรายชื่อห้อง) · Leaderboard (`saveScore` เก็บ `avatar` · API ส่ง `avatar` · แถวเก่า = 0 · `ai_start` รับ `avatar` · `cleanAvatar` ย้ายไป `clean.js`) · เจ้าของชื่อไม่เปลี่ยน · smoke 40.4
+  3. `.gitignore` เพิ่ม `:memory:.ses*` (เช็คด้วย `git check-ignore -- "./:memory:.ses"` เพราะ `:` นำหน้าเป็น pathspec ของ git)
+  4. ปุ่มเตะผู้เล่น 44px เฉพาะจอ ≤ 1000px (จอคอมคง 28px ห้องรอยังพอดีจอ) · แถบขนาดแปรงจอแคบ 44px อยู่แล้ว
+  5. ทายรัวเกินเพดาน → Toast "พิมพ์เร็วเกินไป" (`useGame({ onRateLimited })` นับ 10 ครั้ง/5 วิ เท่า server · ไม่ส่งข้อความที่ server จะทิ้งอยู่แล้ว · กติกาที่ server ไม่เปลี่ยน)
+  7. แก้เอกสารนี้: Shapes Only มีจริง · เก็บคะแนนใน Upstash เมื่อมี env ไม่มีใช้ไฟล์
+- **ตรวจไม่ได้**: ตัดเน็ตจริง (Chrome จำลองออฟไลน์ไม่ตัด WebSocket ที่เปิดอยู่) · อุปกรณ์จริง · Upstash ตัวจริง · โหมด Claude API (ไม่มี key)
 
 ### ยังไม่ได้ทำ (ตามลำดับใน PROMPTS.md)
 - (ไม่มีแล้ว — ข้อ 8 เสร็จ)
