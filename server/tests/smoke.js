@@ -2093,10 +2093,11 @@ async function main() {
     const c2 = created2.code;
     H2.socket.emit("update_settings", { mode: "team", rounds: 1, drawTime: 30 });
     const members = [];
-    for (const n of ["b1", "a3", "b2", "a5"]) members.push((await join(c2, n)).P);
+    // ชื่อไม่ชนกับครึ่งแรก (B2 ที่ได้คะแนนแล้วไม่มีเจ้าของ = ชื่อถูกล็อก · เทียบไม่สนตัวพิมพ์ "b2" จึงเป็นชื่อเดียวกัน)
+    for (const n of ["tb1", "ta3", "tb2", "ta5"]) members.push((await join(c2, n)).P);
     const [b1, a3, b2, a5] = members;
     await wait(200);
-    check("จัดทีม 3 ต่อ 2 (A: H2,a3,a5 · B: b1,b2)", last(H2, "room_update").players.map((p) => p.team), ["A", "B", "A", "B", "A"]);
+    check("จัดทีม 3 ต่อ 2 (A: H2,ta3,ta5 · B: tb1,tb2)", last(H2, "room_update").players.map((p) => p.team), ["A", "B", "A", "B", "A"]);
     H2.socket.emit("start_game");
     const o = await b1.wait("choose_word");
     const w3 = o.options[0];
@@ -2110,7 +2111,7 @@ async function main() {
       [count(a3, "team_skipped") === 1 && last(a3, "team_skipped").team === "A", count(b1, "team_skipped")], [true, 0]);
     a3.socket.emit("guess", { text: w3 });
     await wait(300);
-    check("ทีม A ไม่มีคนวาดแล้ว ทายถูกก็ไม่ได้คะแนน", last(a3, "room_update").players.find((p) => p.name === "a3").score, 0);
+    check("ทีม A ไม่มีคนวาดแล้ว ทายถูกก็ไม่ได้คะแนน", last(a3, "room_update").players.find((p) => p.name === "ta3").score, 0);
     b2.socket.emit("guess", { text: w3 });
     const e3 = await b1.wait("round_end", null, 3000);
     check("ทีม B ทายถูก → จบตา (ทีม A ถูกข้าม) ไม่ล่ม", [e3.word, e3.firstTeam], [w3, "B"]);
@@ -3200,7 +3201,8 @@ async function main() {
     const boardApi = await (await fetch(`${URL}/api/leaderboard?board=multi`)).text();
     const hiddenHash = lb.loadScores().find((r) => r.name === "OwnerName")?.ownerHash;
     checkOk("event และ API ไม่มี key หรือ hash เจ้าของชื่อ", ![keyA, keyB, keyC, hiddenHash, "ownerHash"].some((v) => v && (roomJson.includes(v) || roomsApi.includes(v) || boardApi.includes(v))));
-    check("ข้อมูลคะแนนเก่าที่ไม่มี ownerHash ยังใช้ชื่อได้", lb.canUseName([{ name: "Legacy", score: 10, playedAt: "2026-01-01 00:00" }], "legacy", keyB), true);
+    // ชื่อเก่าที่ไม่มีเจ้าของถูกล็อก (ผู้ใช้เลือก 14 ต.ค.) — รายละเอียดทุกทางอยู่ข้อ 40.2
+    check("ข้อมูลคะแนนเก่าที่ไม่มี ownerHash ถูกล็อก ใช้ชื่อไม่ได้", lb.canUseName([{ name: "Legacy", score: 10, playedAt: "2026-01-01 00:00" }], "legacy", keyB), false);
     for (const rec of [ownerHost, other, guest]) rec.socket.disconnect();
   });
 
@@ -3260,6 +3262,36 @@ async function main() {
     const json = JSON.stringify([host.dump(), owner.dump(), intruder.dump()]);
     checkOk("event ไม่มีกุญแจหรือ hash เจ้าของชื่อ", ![keyA, keyB, "ownerHash"].some((v) => json.includes(v)));
     for (const r of [host, owner, intruder]) r.socket.disconnect();
+  });
+
+  await runPart("40.2 ชื่อเก่าที่ไม่มีเจ้าของ (ข้อมูลตัวอย่าง seed / แถวก่อนมีระบบนี้) ถูกล็อกทุกทาง", async () => {
+    const lb = require("../leaderboard");
+    const keyA = "f".repeat(32), keyB = "9".repeat(32);
+    // แถวแบบเก่า: ไม่มี ownerHash (หน้าตาเดียวกับที่ npm run seed เขียน)
+    lb.writeScores([...lb.loadScores(), { id: 90001, name: "SeedLegacy", score: 400, levelReached: 3, playedAt: "2026-01-02 10:00" }]);
+    for (const [label, key] of [["กุญแจ A", keyA], ["กุญแจ B", keyB], ["ไม่ส่งกุญแจ", undefined]]) {
+      const P = track(await connect());
+      const c = await emitAck(P.socket, "create_room", { name: "SeedLegacy", avatar: 0, nameOwnerKey: key });
+      check(`create_room ชื่อเก่า (${label}) = NAME_OWNED`, c?.error, "NAME_OWNED");
+      P.clear();
+      P.socket.emit("ai_start", { name: " seedlegacy ", nameOwnerKey: key });
+      const e = await P.wait("game_error", (x) => x.code === "NAME_OWNED", 1500).catch(() => null);
+      check(`ai_start ชื่อเก่า (${label}) = NAME_OWNED`, e?.code, "NAME_OWNED");
+      P.socket.disconnect();
+    }
+    const host = track(await connect());
+    const room = await emitAck(host.socket, "create_room", { name: "หัวห้อง402", avatar: 0, nameOwnerKey: keyA });
+    const J = track(await connect());
+    const j = await emitAck(J.socket, "join_room", { code: room.code, name: "Seed\u200bLegacy", avatar: 0, nameOwnerKey: keyB });
+    check("join_room ชื่อเก่า (แทรกอักขระล่องหน) = NAME_OWNED", j?.error, "NAME_OWNED");
+    check("บันทึกคะแนนด้วยชื่อเก่าไม่ได้ (ไม่มีใครยึดเป็นเจ้าของได้)", lb.saveScore({ name: "SeedLegacy", score: 999, levelReached: 9, nameOwnerKey: keyA }), null);
+    check("แถวเก่ายังไม่มีเจ้าของหลังพยายามยึด", lb.loadScores().filter((r) => r.name === "SeedLegacy").map((r) => r.ownerHash ?? null), [null]);
+    // ชื่อใหม่ที่ยังไม่เคยอยู่ในกระดาน ยังใช้ได้ และคนแรกที่บันทึกพร้อมกุญแจเป็นเจ้าของ
+    const N = track(await connect());
+    const n = await emitAck(N.socket, "create_room", { name: "BrandNew402", avatar: 0, nameOwnerKey: keyB });
+    checkOk("ชื่อใหม่ที่ไม่มีในกระดานยังใช้ได้", n?.ok);
+    checkOk("บันทึกคะแนนชื่อใหม่ได้ และเป็นเจ้าของ", !!lb.saveScore({ name: "BrandNew402", score: 5, levelReached: 1, nameOwnerKey: keyB }) && lb.canUseName(lb.loadScores(), "brandnew402", keyB));
+    for (const r of [host, J, N]) r.socket.disconnect();
   });
 
   await runPart("41. ตรวจชื่อไม่สุภาพทุกทาง และยุบตัวอักษรหลบเลี่ยง", async () => {

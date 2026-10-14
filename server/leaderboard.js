@@ -191,8 +191,8 @@ function saveScore({ name, score, levelReached, board, nameOwnerKey } = {}, play
     const rows = loadScores();
     const existingOwner = ownerOfName(rows, cleanedName);
     const suppliedOwner = hashOwnerKey(nameOwnerKey);
-    // ตรวจซ้ำตอนบันทึก ป้องกันการเรียก saveScore ข้ามด่านตรวจชื่อ
-    if (existingOwner && existingOwner !== suppliedOwner) return null;
+    // ตรวจซ้ำตอนบันทึก ป้องกันการเรียก saveScore ข้ามด่านตรวจชื่อ (กติกาเดียวกับตอนเข้าเกม รวมชื่อเก่าที่ถูกล็อก)
+    if (!canUseName(rows, cleanedName, nameOwnerKey)) return null;
     const row = {
       id: rows.reduce((max, r) => Math.max(max, Number(r.id) || 0), 0) + 1,
       name: cleanedName,

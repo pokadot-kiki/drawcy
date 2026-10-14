@@ -42,9 +42,16 @@ function ownerOfName(rows, name) {
   return owner?.ownerHash ?? null;
 }
 
+// ใช้ชื่อนี้ได้ไหม (server ตรวจที่ create_room · join_room · ai_start และตอนบันทึกคะแนน)
+//   มีเจ้าของ        → ได้เฉพาะกุญแจที่ตรงกับเจ้าของ
+//   มีในกระดานแต่ไม่มีเจ้าของ (ข้อมูลตัวอย่างจาก seed · แถวก่อนมีระบบนี้ · บันทึกโดยไม่มีกุญแจ)
+//                     → ล็อกไว้ ไม่มีใครใช้ได้ (ผู้ใช้เลือกแบบนี้ 14 ต.ค. กันคนมาอ้างชื่อเก่าของคนอื่น)
+//   ยังไม่มีในกระดาน  → ใช้ได้ คนแรกที่บันทึกคะแนนพร้อมกุญแจเป็นเจ้าของ
 function canUseName(rows, name, key) {
   const ownerHash = ownerOfName(rows, name);
-  return !ownerHash || (hashOwnerKey(key) !== null && hashOwnerKey(key) === ownerHash);
+  if (ownerHash) return hashOwnerKey(key) !== null && hashOwnerKey(key) === ownerHash;
+  const normalized = normalizeOwnerName(name);
+  return !rows.some((row) => normalizeOwnerName(row?.name) === normalized);
 }
 
 module.exports = { OWNER_KEY_RE, normalizeOwnerName, hashOwnerKey, ownerOfName, canUseName };
