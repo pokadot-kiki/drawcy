@@ -8,7 +8,7 @@ const crypto = require("crypto");
 const path = require("path");
 const { Server } = require("socket.io");
 const { cleanName, isNameAllowed } = require("./clean");
-const { hashOwnerKey } = require("./name-ownership");
+const { hashOwnerKey, normalizeOwnerName } = require("./name-ownership");
 const { TEAM_IDS, computeBalancedTeams } = require("./teams"); // จัดทีมให้สมดุล (ฟังก์ชันล้วน แยกไฟล์ให้ทดสอบตรง ๆ)
 const leaderboard = require("./leaderboard");
 const ai = require("./ai");
@@ -1602,7 +1602,9 @@ io.on("connection", (socket) => {
     // เป็นสมาชิกห้องนี้อยู่แล้ว (เช่นรีเฟรชแล้วกดเข้าห้องเดิมภายในเวลารอ) = กลับเข้าที่เดิม ไม่สร้างผู้เล่นซ้ำ
     if (room.players.some((p) => p.id === socket.data.pid)) return callback(rejoinRoom(socket, room));
     if (room.players.length >= roomMax(room)) return callback({ ok: false, error: "ROOM_FULL" });
-    if (room.players.some((p) => p.name === name)) return callback({ ok: false, error: "NAME_TAKEN" });
+    // ชื่อซ้ำในห้อง เทียบแบบเดียวกับเจ้าของชื่อ (ไม่สนตัวพิมพ์ · อักขระล่องหน · ช่องว่างซ้อน) — "Tar" กับ "tar" นับเป็นชื่อเดียวกัน
+    const key = normalizeOwnerName(name);
+    if (room.players.some((p) => normalizeOwnerName(p.name) === key)) return callback({ ok: false, error: "NAME_TAKEN" });
 
     leaveRoom(socket);
     const joiner = { id: socket.data.pid, name, avatar: cleanAvatar(data.avatar), score: 0, isHost: false, team: null, connected: true, ready: false };

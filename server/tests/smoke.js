@@ -3407,6 +3407,21 @@ async function main() {
     for (const r of [host, J, N]) r.socket.disconnect();
   });
 
+  await runPart("40.3 ชื่อซ้ำในห้อง (NAME_TAKEN) เทียบแบบเดียวกับเจ้าของชื่อ", async () => {
+    const host = track(await connect());
+    const made = await emitAck(host.socket, "create_room", { name: "Tar", avatar: 0 });
+    for (const [label, name] of [["ตัวพิมพ์เล็ก", "tar"], ["ตัวพิมพ์ใหญ่ + ช่องว่าง", "  TAR "], ["แทรกอักขระล่องหน", "T\u200bar"], ["ตัวเต็มความกว้าง", "Ｔａｒ"]]) {
+      const P = track(await connect());
+      const r = await emitAck(P.socket, "join_room", { code: made.code, name, avatar: 1 });
+      check(`join_room ชื่อซ้ำ (${label}) = NAME_TAKEN`, r?.error, "NAME_TAKEN");
+      P.socket.disconnect();
+    }
+    const ok2 = track(await connect());
+    const r2 = await emitAck(ok2.socket, "join_room", { code: made.code, name: "Tarn", avatar: 1 });
+    checkOk("ชื่อที่ต่างจริง (Tarn) ยังเข้าได้", r2?.ok);
+    for (const r of [host, ok2]) r.socket.disconnect();
+  });
+
   await runPart("41. ตรวจชื่อไม่สุภาพทุกทาง และยุบตัวอักษรหลบเลี่ยง", async () => {
     const { isNameAllowed } = require("../clean");
     const passNames = ["peacock", "Cocktail", "Scunthorpe", "ฟักทอง", "สาธิต"];
