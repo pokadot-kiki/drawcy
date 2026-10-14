@@ -1237,7 +1237,10 @@ function removePlayer(room, pid) {
 }
 
 // ---------- Solo แข่งกับ AI (ข้อ 7) ----------
-// สถานะเกมเก็บที่ socket.data.solo ของผู้เล่นคนนั้นเอง ไม่เกี่ยวกับ rooms จึงไม่ปนกับเกมห้อง
+// สถานะเกมผูกกับ playerId (ไม่ใช่ socket) เก็บใน soloSessions → รีเฟรชหน้าแล้ว socket ตัวใหม่ขอกลับเข้าเกมเดิมได้ (ai_resume)
+// ส่ง event ผ่าน io.to(playerId) (ห้องส่วนตัวที่ทุก socket ของคนนั้นเข้าอยู่แล้ว) ตัวจับเวลาที่ตั้งไว้จึงส่งถึง socket ตัวใหม่ได้เอง
+// หลุดแล้ว: ตัวจับเวลาด่านเดินต่อ (หมดเวลายังนับ) · รอ REJOIN_GRACE_MS ไม่กลับมา = เลิกเกม ไม่บันทึกคะแนน
+// ไม่มี playerKey (test.html / สคริปต์) กลับเข้าไม่ได้อยู่แล้ว จึงเลิกเกมทันทีที่หลุดเหมือนเดิม
 // กติกาทั้งหมด (เวลา ชีวิต คะแนน) server คุมเอง client ส่งได้แค่ภาพ
 const SOLO_LIVES = 3;
 const SOLO_NEXT_DELAY_MS = Number(process.env.AI_NEXT_DELAY_MS) || 4000; // พักให้ดูผลก่อนขึ้นด่านถัดไป
@@ -1252,6 +1255,7 @@ const DRAW_SIZE = 4;
 const GUESS_MIN_GAP_MS = 300;  // พิมพ์ทายถี่กว่านี้ทิ้งเงียบ ๆ
 const MAX_GUESS_CHARS = 40;
 const IMAGE_RE = /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+const soloSessions = new Map(); // playerId → เกม Solo ที่ยังเล่นอยู่ (หรือเพิ่งจบ รอให้หน้าเว็บมารับผล)
 
 // เวลาสั้นลงตามด่านเหมือนเดิม · ชุดคำ: ถ้าผู้เล่นเลือกระดับความยากไว้ใช้ระดับนั้นทั้งเกม ไม่เลือก = ไล่ตามด่านแบบเดิม
 function soloConfig(solo) {
@@ -1259,14 +1263,38 @@ function soloConfig(solo) {
   return solo.difficulty ? { ...cfg, difficulty: solo.difficulty } : cfg;
 }
 
-function stopSolo(socket) {
-  const solo = socket.data.solo;
+// ส่ง event ของ Solo ถึงผู้เล่นคนนี้ ไม่ว่าตอนนี้เขาต่ออยู่ด้วย socket ตัวไหน (หลุดอยู่ = ไม่มีใครรับ ก็หายไปเฉยๆ)
+function emitSolo(solo, event, data) {
+  io.to(solo.pid).emit(event, data);
+}
+
+// เลิกเกม (ไม่บันทึกคะแนน) แล้วลบออกจากที่เก็บ — ใช้ตอนกดออก · เริ่มเกมใหม่ทับ · รอเกินเวลา
+function dropSolo(solo) {
   if (!solo) return;
   clearTimeout(solo.roundTimer);
   clearTimeout(solo.nextTimer);
+  clearTimeout(solo.dropTimer);
   clearStrokeTimers(solo);
   solo.over = true;
+  if (soloSessions.get(solo.pid) === solo) soloSessions.delete(solo.pid);
+}
+
+// socket นี้เลิก Solo ที่เล่นอยู่ (ทั้งที่ผูกกับ socket นี้ และที่ค้างอยู่ใต้ playerId เดียวกัน)
+function stopSolo(socket) {
+  dropSolo(socket.data.solo);
+  dropSolo(soloSessions.get(socket.data.pid));
   socket.data.solo = null;
+}
+
+// socket หลุดระหว่างเล่น Solo: มี playerKey → พักเกมไว้รอกลับมา · ไม่มี → เลิกทันที (กลับมาไม่ได้อยู่แล้ว)
+function suspendSolo(socket) {
+  const solo = socket.data.solo;
+  socket.data.solo = null;
+  if (!solo || solo.over) return;
+  if (!socket.data.persistent) return dropSolo(solo);
+  if ((io.sockets.adapter.rooms.get(solo.pid)?.size ?? 0) > 0) return; // ยังมี socket อื่นของคนนี้ต่ออยู่
+  clearTimeout(solo.dropTimer);
+  solo.dropTimer = setTimeout(() => dropSolo(solo), REJOIN_GRACE_MS);
 }
 
 function clearStrokeTimers(solo) {
@@ -1274,7 +1302,7 @@ function clearStrokeTimers(solo) {
   solo.strokeTimers = [];
 }
 
-function startSoloRound(socket, solo) {
+function startSoloRound(solo) {
   const cfg = soloConfig(solo);
   const time = SOLO_TIME_OVERRIDE || cfg.time;
   const word = ai.pickWord(ai.soloWords(WORD_BANK), cfg.difficulty, solo.usedWords);
@@ -1285,16 +1313,31 @@ function startSoloRound(socket, solo) {
   solo.lastSnapshotAt = 0;
   solo.busy = false;
   solo.wrong = [];
+  solo.guessLog = []; // คำที่ AI เดาในด่านนี้ (ส่งคืนตอน ai_resume)
   solo.drawing = true;
+  solo.resting = false;
   solo.drawNext = aiDrawings.available(ai.soloWords(WORD_BANK), cfg.difficulty); // ด่านนี้จะมีช่องสองต่อท้ายไหม
   solo.roundId++;
   clearTimeout(solo.roundTimer);
-  solo.roundTimer = setTimeout(() => endSoloRound(socket, solo, false), time * 1000);
+  solo.roundTimer = setTimeout(() => endSoloRound(solo, false), time * 1000);
   // ส่งคำจริงให้ผู้เล่นได้เพราะเขาเป็นคนวาด · aiMode บอกว่าตอนนี้ AI จริงหรือจำลอง
-  socket.emit("ai_round_start", { level: solo.level, word, time, lives: solo.lives, aiMode: ai.aiMode(), drawNext: solo.drawNext, difficulty: cfg.difficulty });
+  solo.roundInfo = { level: solo.level, word, time, lives: solo.lives, aiMode: ai.aiMode(), drawNext: solo.drawNext, difficulty: cfg.difficulty };
+  emitSolo(solo, "ai_round_start", solo.roundInfo);
 }
 
-function endSoloRound(socket, solo, correct) {
+// ช่วงพักหลังจบช่วง: จำผลไว้ให้คนที่รีเฟรชระหว่างพักเห็นหน้าต่างสรุปเดิม
+function startRest(solo, result, next) {
+  solo.resting = true;
+  solo.lastResult = result;
+  solo.restUntil = Date.now() + SOLO_NEXT_DELAY_MS;
+  solo.nextTimer = setTimeout(() => {
+    if (solo.over) return;
+    solo.resting = false;
+    next();
+  }, SOLO_NEXT_DELAY_MS);
+}
+
+function endSoloRound(solo, correct) {
   if (solo.over || !solo.drawing) return; // จบไปแล้ว (เช่น ทายถูกพร้อมเวลาหมด) ไม่นับซ้ำ
   solo.drawing = false;
   clearTimeout(solo.roundTimer);
@@ -1306,30 +1349,30 @@ function endSoloRound(socket, solo, correct) {
   } else {
     solo.lives--;
   }
-  socket.emit("ai_round_end", { correct, gained, totalScore: solo.totalScore, lives: solo.lives });
+  emitSolo(solo, "ai_round_end", { correct, gained, totalScore: solo.totalScore, lives: solo.lives });
 
-  if (solo.lives <= 0) return endSoloGame(socket, solo);
+  if (solo.lives <= 0) return endSoloGame(solo);
   solo.passed = correct; // ผ่านช่องแรกหรือไม่ — เอาไปตัดสินขึ้นด่านเมื่อจบช่องสอง (advanceSolo)
-  solo.nextTimer = setTimeout(() => {
-    if (solo.over) return;
-    if (solo.drawNext) startDrawRound(socket, solo);
-    else advanceSolo(socket, solo);
-  }, SOLO_NEXT_DELAY_MS);
+  // word ของช่วง 1 ผู้เล่นรู้อยู่แล้ว (เป็นคนวาดเอง) จึงเก็บไว้ในผลได้
+  startRest(solo, { kind: "draw", correct, gained, word: solo.word }, () => {
+    if (solo.drawNext) startDrawRound(solo);
+    else advanceSolo(solo);
+  });
 }
 
 // ผ่านช่องแรกถึงขึ้นด่าน · ทายไม่ออกเสียชีวิตแต่ยังอยู่ด่านเดิม (ได้คำใหม่) · แล้วเริ่มช่องแรกของด่านถัดไป
-function advanceSolo(socket, solo) {
+function advanceSolo(solo) {
   if (solo.over) return;
   if (solo.passed) solo.level++;
-  startSoloRound(socket, solo);
+  startSoloRound(solo);
 }
 
 // ช่องสอง: server เล่นซ้ำภาพคนจริงทีละเส้น ผู้เล่นพิมพ์ทาย · server ตัดสินเอง
 // ⚠️ ห้ามให้คำตอบ (ทั้งไทย/อังกฤษ) อยู่ใน event ใดก่อน ai_draw_end — ส่งได้แค่หมวดหมู่เป็นคำใบ้
-function startDrawRound(socket, solo) {
+function startDrawRound(solo) {
   const cfg = soloConfig(solo);
   const picked = aiDrawings.pick(ai.soloWords(WORD_BANK), cfg.difficulty, solo.usedWords);
-  if (!picked) return advanceSolo(socket, solo); // ไม่มีภาพ → ข้ามช่องสอง ไม่ล่ม
+  if (!picked) return advanceSolo(solo); // ไม่มีภาพ → ข้ามช่องสอง ไม่ล่ม
   const time = SOLO_TIME_OVERRIDE || cfg.time;
   solo.usedWords.add(picked.word);
   solo.guessWord = picked.word;
@@ -1337,23 +1380,28 @@ function startDrawRound(socket, solo) {
   solo.guessStartedAt = Date.now();
   solo.lastGuessAt = 0;
   solo.guessing = true;
+  solo.sentStrokes = []; // เส้นที่ส่งไปแล้ว (ส่งคืนตอน ai_resume ภาพจะได้กลับมาครบ)
+  solo.replies = [];     // คำที่ผู้เล่นทายผิดในช่วงนี้
   solo.roundId++;
   clearStrokeTimers(solo);
   clearTimeout(solo.roundTimer);
-  solo.roundTimer = setTimeout(() => endDrawRound(socket, solo, false), time * 1000);
-  socket.emit("ai_draw_start", { level: solo.level, time, lives: solo.lives, category: picked.category });
+  solo.roundTimer = setTimeout(() => endDrawRound(solo, false), time * 1000);
+  solo.watchInfo = { level: solo.level, time, lives: solo.lives, category: picked.category }; // ไม่มีคำตอบ
+  emitSolo(solo, "ai_draw_start", solo.watchInfo);
   for (const s of aiDrawings.schedule(picked.strokes, time * 1000 * DRAW_BUDGET_RATIO)) {
     solo.strokeTimers.push(
       setTimeout(() => {
         if (!solo.over && solo.guessing) {
-          socket.emit("ai_draw_stroke", { points: s.points, color: DRAW_COLOR, size: DRAW_SIZE, ms: s.ms });
+          const stroke = { points: s.points, color: DRAW_COLOR, size: DRAW_SIZE, ms: s.ms };
+          solo.sentStrokes.push(stroke);
+          emitSolo(solo, "ai_draw_stroke", stroke);
         }
       }, s.at)
     );
   }
 }
 
-function endDrawRound(socket, solo, correct) {
+function endDrawRound(solo, correct) {
   if (solo.over || !solo.guessing) return;
   solo.guessing = false;
   clearTimeout(solo.roundTimer);
@@ -1366,9 +1414,9 @@ function endDrawRound(socket, solo, correct) {
     solo.lives--;
   }
   // เฉลยคำตอบได้แล้ว เพราะช่องนี้จบแล้ว
-  socket.emit("ai_draw_end", { correct, gained, totalScore: solo.totalScore, lives: solo.lives, word: solo.guessWord });
-  if (solo.lives <= 0) return endSoloGame(socket, solo);
-  solo.nextTimer = setTimeout(() => advanceSolo(socket, solo), SOLO_NEXT_DELAY_MS);
+  emitSolo(solo, "ai_draw_end", { correct, gained, totalScore: solo.totalScore, lives: solo.lives, word: solo.guessWord });
+  if (solo.lives <= 0) return endSoloGame(solo);
+  startRest(solo, { kind: "guess", correct, gained, word: solo.guessWord }, () => advanceSolo(solo));
 }
 
 function handleSoloGuess(socket, data) {
@@ -1379,21 +1427,47 @@ function handleSoloGuess(socket, data) {
   const now = Date.now();
   if (now - solo.lastGuessAt < GUESS_MIN_GAP_MS) return;
   solo.lastGuessAt = now;
-  if (normalize(text) === normalize(solo.guessWord)) return endDrawRound(socket, solo, true);
-  socket.emit("ai_draw_reply", { text, correct: false });
+  if (normalize(text) === normalize(solo.guessWord)) return endDrawRound(solo, true);
+  solo.replies.push(text);
+  emitSolo(solo, "ai_draw_reply", { text, correct: false });
 }
 
 // จบเกม: server บันทึกคะแนนเอง (client ส่งคะแนนมาไม่ได้) แล้วบอกอันดับ
-function endSoloGame(socket, solo) {
+// จบตามกติกา (ชีวิตหมด) ระหว่างที่หลุดอยู่ก็บันทึก เพราะเกมจบจริง · เก็บผลไว้ให้หน้าเว็บที่รีเฟรชมารับ (ai_resume) ภายในเวลารอ
+function endSoloGame(solo) {
   const result = { name: solo.name, score: solo.totalScore, levelReached: solo.level };
   solo.over = true;
-  socket.data.solo = null;
+  solo.drawing = false;
+  solo.guessing = false;
+  solo.resting = false;
+  clearTimeout(solo.roundTimer);
+  clearTimeout(solo.nextTimer);
+  clearStrokeTimers(solo);
   leaderboard.saveScore({ ...result, nameOwnerKey: solo.nameOwnerKey });
-  socket.emit("ai_game_end", {
-    totalScore: result.score,
-    levelReached: result.levelReached,
-    rank: leaderboard.rankOf(result),
-  });
+  solo.final = { totalScore: result.score, levelReached: result.levelReached, rank: leaderboard.rankOf(result) };
+  emitSolo(solo, "ai_game_end", solo.final);
+  clearTimeout(solo.dropTimer);
+  solo.dropTimer = setTimeout(() => { if (soloSessions.get(solo.pid) === solo) soloSessions.delete(solo.pid); }, REJOIN_GRACE_MS);
+}
+
+// สถานะปัจจุบันของเกม Solo สำหรับ ai_resume — ส่งเฉพาะสิ่งที่ผู้เล่นเคยได้รับอยู่แล้ว
+// ⚠️ ช่วง 2 ที่ยังไม่จบ: ห้ามมี guessWord (มีแค่ category กับเส้นที่ส่งไปแล้ว) · มีเทสตรวจ
+function soloSnapshot(solo) {
+  const base = { level: solo.level, lives: solo.lives, totalScore: solo.totalScore };
+  const left = (startedAt, time) => Math.max(0, Math.ceil(time - (Date.now() - startedAt) / 1000));
+  if (solo.over) return { ...base, phase: "over", final: solo.final };
+  if (solo.drawing) {
+    return { ...base, phase: "draw", round: { ...solo.roundInfo, lives: solo.lives }, timeLeft: left(solo.startedAt, solo.time), guesses: solo.guessLog };
+  }
+  if (solo.guessing) {
+    // round = ข้อมูลช่วง 1 ของด่านนี้ (คำของช่วง 1 ผู้เล่นวาดเองรู้อยู่แล้ว) ไว้โชว์เลขด่าน · ไม่มีคำตอบของภาพช่วง 2
+    return { ...base, phase: "watch", round: solo.roundInfo, watch: { ...solo.watchInfo, lives: solo.lives }, timeLeft: left(solo.guessStartedAt, solo.guessTime), strokes: solo.sentStrokes, replies: solo.replies };
+  }
+  // ช่วงพัก: ผลของช่วงที่เพิ่งจบ (คำเฉลยถูกเปิดไปแล้วทั้งสองแบบ) · หลังช่วง 2 แนบเส้นของภาพนั้นไปด้วย
+  const rest = { ...base, phase: "rest", round: solo.roundInfo, result: solo.lastResult, restLeft: Math.max(0, Math.ceil((solo.restUntil - Date.now()) / 1000)) };
+  if (solo.lastResult?.kind === "guess") Object.assign(rest, { strokes: solo.sentStrokes, replies: solo.replies });
+  else rest.guesses = solo.guessLog;
+  return rest;
 }
 
 async function handleSoloSnapshot(socket, data) {
@@ -1418,13 +1492,14 @@ async function handleSoloSnapshot(socket, data) {
     // รอ AI อยู่ระหว่างนั้นด่านอาจจบหรือผู้เล่นออกไปแล้ว ผลที่มาช้าต้องทิ้ง
     if (solo.over || !solo.drawing || solo.roundId !== roundId) return;
     if (!correct) solo.wrong.push(guess);
-    socket.emit("ai_guess", { guess, correct });
-    if (correct) endSoloRound(socket, solo, true);
+    solo.guessLog.push({ guess, correct });
+    emitSolo(solo, "ai_guess", { guess, correct });
+    if (correct) endSoloRound(solo, true);
   } catch (err) {
     // log แค่ข้อความ ไม่ log key หรือคำขอ
     console.warn("เรียก AI ไม่สำเร็จ:", err.message);
     if (!solo.over && solo.roundId === roundId) {
-      socket.emit("game_error", { code: "AI_UNAVAILABLE", message: "AI ตอบไม่ได้ในตอนนี้ ลองใหม่อีกครั้ง" });
+      emitSolo(solo, "game_error", { code: "AI_UNAVAILABLE", message: "AI ตอบไม่ได้ในตอนนี้ ลองใหม่อีกครั้ง" });
     }
   } finally {
     if (solo.roundId === roundId) solo.busy = false;
@@ -1888,14 +1963,29 @@ io.on("connection", (socket) => {
     const nameError = nameOwnerOk(socket, name, data?.nameOwnerKey);
     if (nameError) return socket.emit("game_error", { code: nameError, message: nameError === "NAME_OWNED" ? "ชื่อนี้มีเจ้าของแล้ว ลองชื่ออื่นนะ" : "ลองใหม่อีกครั้งในอีกสักครู่" });
     leaveRoom(socket); // ผู้เล่นหนึ่งคนอยู่ได้อย่างเดียว: ห้อง หรือ Solo
-    stopSolo(socket);  // กดเริ่มซ้ำ = เริ่มเกมใหม่ เกมเก่าทิ้ง
+    stopSolo(socket);  // กดเริ่มซ้ำ = เริ่มเกมใหม่ เกมเก่าทิ้ง (รวมเกมที่ค้างอยู่ใต้ playerId เดียวกัน)
     const solo = {
+      pid: socket.data.pid,
       name, nameOwnerKey: data?.nameOwnerKey, difficulty: LEVELS.includes(data?.difficulty) ? data.difficulty : null, level: 1, lives: SOLO_LIVES, totalScore: 0, usedWords: new Set(), roundId: 0,
-      over: false, drawing: false, busy: false, roundTimer: null, nextTimer: null,
-      guessing: false, drawNext: false, passed: false, strokeTimers: [],
+      over: false, drawing: false, busy: false, roundTimer: null, nextTimer: null, dropTimer: null,
+      guessing: false, resting: false, drawNext: false, passed: false, strokeTimers: [],
     };
     socket.data.solo = solo;
-    startSoloRound(socket, solo);
+    soloSessions.set(solo.pid, solo);
+    startSoloRound(solo);
+  });
+
+  // ขอกลับเข้าเกม Solo เดิมหลังรีเฟรช — รู้ว่าเป็นใครจาก playerKey ใน handshake (ไม่รับ id จาก client)
+  // ตอบสถานะปัจจุบันครั้งเดียวทาง callback แล้ว event ต่อจากนี้มาถึง socket ตัวใหม่ตามปกติ
+  socket.on("ai_resume", (data, callback) => {
+    if (typeof callback !== "function") return;
+    const solo = socket.data.persistent ? soloSessions.get(socket.data.pid) : null;
+    if (!solo) return callback({ ok: false, error: "NOT_IN_GAME" });
+    if (socket.data.roomCode) leaveRoom(socket);
+    if (!solo.over) clearTimeout(solo.dropTimer); // กลับมาทันเวลา = เลิกนับถอยหลังเลิกเกม
+    socket.data.solo = solo.over ? null : solo;
+    callback({ ok: true, state: soloSnapshot(solo) });
+    if (solo.over) dropSolo(solo); // รับผลจบเกมไปแล้ว ไม่ต้องเก็บต่อ
   });
 
   socket.on("ai_snapshot", (data) => {
@@ -1913,7 +2003,7 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     console.log("มีคนหลุดออกไป:", socket.id);
-    stopSolo(socket); // เล่นไม่จบ = ไม่บันทึกคะแนน
+    suspendSolo(socket); // มี playerKey = พักเกมไว้รอรีเฟรชกลับมา (ไม่กลับภายในเวลา = เลิก ไม่บันทึกคะแนน)
     handleDisconnect(socket); // อยู่ในห้อง: รอให้กลับมาก่อน ไม่ลบทันที
   });
 });

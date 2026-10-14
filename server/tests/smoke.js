@@ -3164,6 +3164,119 @@ async function main() {
     for (const P of socks) P.socket.disconnect();
   });
 
+  await runPart("39.5 Solo รีเฟรชแล้วกลับเข้าเกมเดิม (ai_resume) · หมดเวลารอ = เลิกไม่บันทึก · คนอื่นเข้าไม่ได้ · ไม่มีคำตอบรั่ว", async () => {
+    const URL2 = "http://localhost:3001";
+    const scores = path.join(SCORES_DIR, "scores-resume.json");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "jdi-resume-"));
+    const fixture = path.join(dir, "ai-drawings.json");
+    // ภาพช่วง 2 มีแค่ "cat" (แมว) — ถ้ามีช่วง 2 คำตอบคือแมวแน่นอน เทสจึงตรวจได้ว่าคำนี้ไม่หลุดก่อนจบช่วง
+    fs.writeFileSync(fixture, JSON.stringify({ cat: [[[0.2, 0.2, 0.5, 0.3, 0.8, 0.2], [0.3, 0.5, 0.7, 0.5], [0.5, 0.6, 0.5, 0.8]]] }));
+    const env = { ...process.env, SCORES_FILE: scores, PORT: "3001", AI_MODE: "mock", AI_MOCK_CHANCE: "0", AI_TIME_OVERRIDE: "4",
+      AI_NEXT_DELAY_MS: "1500", REJOIN_GRACE_MS: "1500", AI_DRAWINGS_FILE: fixture };
+    const srv = spawn(process.execPath, ["index.js"], { cwd: SERVER_DIR, stdio: "ignore", env });
+    const socks = [];
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const connectAs = (key) => new Promise((resolve, reject) => {
+      const s = io(URL2, { transports: ["websocket"], auth: key ? { playerKey: key } : undefined, forceNew: true });
+      const t = setTimeout(() => reject(new Error("ต่อ server 3001 ไม่ติด")), 8000);
+      s.on("connect", () => { clearTimeout(t); const P = track(s); socks.push(P); resolve(P); });
+      s.on("connect_error", (e) => { clearTimeout(t); reject(e); });
+    });
+    const readScores = () => { try { return JSON.parse(fs.readFileSync(scores, "utf8")); } catch { return []; } };
+    try {
+      let up = false;
+      for (let i = 0; i < 100 && !up; i++) { up = await fetch(`${URL2}/test.html`).then((r) => r.ok).catch(() => false); if (!up) await wait(100); }
+      checkOk("server ตัวที่สอง (รอหลังหลุด 1.5 วิ · ด่านละ 4 วิ) เปิดได้", up);
+      const KEY_A = "resume-key-aaaaaaaaaaaa", KEY_B = "resume-key-bbbbbbbbbbbb", KEY_C = "resume-key-cccccccccccc", KEY_D = "resume-key-dddddddddddd";
+
+      // ---------- ช่วง 1: หลุด แล้วกลับมาด้วยกุญแจเดิม ----------
+      const A1 = await connectAs(KEY_A);
+      A1.socket.emit("ai_start", { name: "Resume43", nameOwnerKey: "1".repeat(32), difficulty: "easy" });
+      const rs = await A1.wait("ai_round_start", null, 3000);
+      A1.socket.disconnect();
+      await wait(300);
+      const A2 = await connectAs(KEY_A);
+      const r1 = await emitAck(A2.socket, "ai_resume", {});
+      checkOk("ai_resume ช่วง 1: ok · phase draw", r1?.ok && r1.state?.phase === "draw");
+      check("ai_resume ช่วง 1: คำ ด่าน ชีวิต คะแนน ตรงกับเกมเดิม", [r1?.state?.round?.word, r1?.state?.level, r1?.state?.lives, r1?.state?.totalScore], [rs.word, 1, 3, 0]);
+      checkOk("ai_resume ช่วง 1: เวลาที่เหลือน้อยกว่าเวลาเต็ม (ตัวจับเวลาเดินต่อ ไม่เริ่มใหม่)", r1?.state?.timeLeft >= 1 && r1.state.timeLeft <= 4 && Array.isArray(r1.state.guesses));
+      // ตัวจับเวลาเดิมที่ตั้งไว้ตอน socket เก่ายังส่งผลถึง socket ตัวใหม่
+      const end1 = await A2.wait("ai_round_end", null, 6000).catch(() => null);
+      check("หมดเวลาด่านเดิม → socket ตัวใหม่ได้ ai_round_end เสีย 1 ชีวิต", end1 && [end1.correct, end1.lives], [false, 2]);
+
+      // ---------- คนอื่น (กุญแจอื่น / ไม่มีกุญแจ) เข้าเกมของเราไม่ได้ ----------
+      const B = await connectAs(KEY_B);
+      const rb = await emitAck(B.socket, "ai_resume", {});
+      check("กุญแจอื่น ai_resume = NOT_IN_GAME", rb, { ok: false, error: "NOT_IN_GAME" });
+      const N = await connectAs(null);
+      const rn = await emitAck(N.socket, "ai_resume", {});
+      check("ไม่ส่งกุญแจ ai_resume = NOT_IN_GAME", rn, { ok: false, error: "NOT_IN_GAME" });
+
+      // ---------- ช่วง 2 (AI วาด): หลุดกลางช่วง กลับมาได้เส้นที่วาดไปแล้ว · ไม่มีคำตอบ ----------
+      const ds = await A2.wait("ai_draw_start", null, 4000).catch(() => null);
+      if (ds) {
+        await A2.wait("ai_draw_stroke", null, 2000).catch(() => null);
+        A2.socket.emit("ai_draw_guess", { text: "ไม่ใช่แน่ๆ" });
+        await wait(300);
+        A2.socket.disconnect();
+        await wait(200);
+        const A3 = await connectAs(KEY_A);
+        const r2 = await emitAck(A3.socket, "ai_resume", {});
+        checkOk("ai_resume ช่วง 2: phase watch · มีหมวด · มีเส้นที่วาดไปแล้ว · คำที่ทายผิดกลับมา",
+          r2?.ok && r2.state.phase === "watch" && r2.state.watch?.category && r2.state.strokes?.length >= 1 && r2.state.replies?.[0] === "ไม่ใช่แน่ๆ");
+        // ตรวจทุก "ค่า" ที่เป็นข้อความ (ไม่ใช่ชื่อช่อง — ชื่อช่อง "category" มีคำว่า cat อยู่ข้างใน)
+        const values = [];
+        JSON.stringify(r2, (k, v) => { if (typeof v === "string") values.push(v); return v; });
+        checkOk("ai_resume ช่วง 2 ไม่มีคำตอบ (แมว / cat) ก่อนจบช่วง", !values.some((v) => v.includes("แมว") || /\bcat\b/i.test(v)));
+        const de = await A3.wait("ai_draw_end", null, 6000).catch(() => null);
+        check("จบช่วง 2 ส่งถึง socket ตัวใหม่ (เฉลยตอนจบได้)", de && de.word, "แมว");
+        // ช่วงพัก: รีเฟรชแล้วเห็นผลเดิม
+        A3.socket.disconnect();
+        await wait(200);
+        const A4 = await connectAs(KEY_A);
+        const r3 = await emitAck(A4.socket, "ai_resume", {});
+        checkOk("ai_resume ช่วงพัก: phase rest · ผลช่วง 2 (เฉลยแล้ว) · เวลาพักที่เหลือ", r3?.ok && r3.state.phase === "rest" && r3.state.result?.kind === "guess" && r3.state.restLeft >= 0);
+        A4.socket.emit("leave_room"); // ออกเอง = เลิกเกม ไม่บันทึก
+        await wait(200);
+        const A5 = await connectAs(KEY_A);
+        check("กดออก (leave_room) แล้ว ai_resume = NOT_IN_GAME", await emitAck(A5.socket, "ai_resume", {}), { ok: false, error: "NOT_IN_GAME" });
+        checkOk("กดออกกลางเกมไม่บันทึกคะแนน", !readScores().some((r) => r.name === "Resume43"));
+      } else {
+        console.log("   ⚠️  ข้ามเช็คช่วง 2: ด่านนี้สุ่มได้คำที่ไม่มีภาพช่วง 2");
+      }
+      check("คนอื่นไม่ได้รับ event ของเกมเราเลย", B.dump().filter((e) => e.name.startsWith("ai_")).length, 0);
+
+      // ---------- หลุดนานเกินเวลารอ → เลิกเกม ไม่บันทึกคะแนน ----------
+      const C1 = await connectAs(KEY_C);
+      C1.socket.emit("ai_start", { name: "Grace43", nameOwnerKey: "2".repeat(32), difficulty: "easy" });
+      await C1.wait("ai_round_start", null, 3000);
+      C1.socket.disconnect();
+      await wait(2300); // เกิน REJOIN_GRACE_MS 1.5 วิ
+      const C2 = await connectAs(KEY_C);
+      check("หลุดเกินเวลารอ ai_resume = NOT_IN_GAME", await emitAck(C2.socket, "ai_resume", {}), { ok: false, error: "NOT_IN_GAME" });
+      await wait(2500); // เผื่อตัวจับเวลาเก่า (ถ้ายังค้าง) ไปบันทึกคะแนน
+      checkOk("หลุดเกินเวลารอแล้วไม่บันทึกคะแนน และไม่มี event ค้างมาถึง", !readScores().some((r) => r.name === "Grace43") && C2.dump().filter((e) => e.name.startsWith("ai_")).length === 0);
+
+      // ---------- เริ่มเกมใหม่ทับเกมที่ค้าง: เกมเก่าหายจริง ----------
+      const D1 = await connectAs(KEY_D);
+      D1.socket.emit("ai_start", { name: "Restart43", nameOwnerKey: "3".repeat(32), difficulty: "easy" });
+      const d1 = await D1.wait("ai_round_start", null, 3000);
+      D1.socket.disconnect();
+      await wait(200);
+      const D2 = await connectAs(KEY_D);
+      D2.socket.emit("ai_start", { name: "Restart43", nameOwnerKey: "3".repeat(32), difficulty: "easy" });
+      const d2 = await D2.wait("ai_round_start", null, 3000);
+      const rd = await emitAck(D2.socket, "ai_resume", {});
+      checkOk("ai_start ใหม่ทับเกมค้าง: resume ได้เกมใหม่ (ด่าน 1 ชีวิตเต็ม) ไม่ใช่เกมเก่า", rd?.ok && rd.state.round?.word === d2.word && rd.state.lives === 3 && d1);
+      D2.socket.emit("leave_room");
+    } finally {
+      for (const P of socks) P.socket.disconnect();
+      srv.kill();
+      await wait(300);
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   await runPart("40. เจ้าของชื่อ Leaderboard กันสวมรอยก่อนเข้าห้องและ Solo", async () => {
     const lb = require("../leaderboard");
     const keyA = "a".repeat(32), keyB = "b".repeat(32), keyC = "c".repeat(32);
