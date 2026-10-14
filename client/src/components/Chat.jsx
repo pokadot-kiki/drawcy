@@ -61,6 +61,14 @@ export default function Chat({
       <div className="chat__list" ref={listRef}>
         {guesses.length === 0 && <p className="chat__empty">{emptyText}</p>}
         {guesses.map((m, i) => {
+          // บรรทัด "ใกล้แล้ว!" เห็นแค่เรา (มาจาก close_guess ที่ server ส่งถึงเราคนเดียว)
+          if (m.close) {
+            return (
+              <p className="chat__row chat__row--close" key={i} role="status">
+                {m.text}
+              </p>
+            );
+          }
           const classes = ["chat__row"];
           if (m.correct) classes.push("chat__row--correct");
           if (m.playerId === meId) classes.push("chat__row--mine");

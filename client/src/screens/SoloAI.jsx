@@ -17,6 +17,7 @@ import { beginStroke, extendStroke, endStroke, clearBoard } from "../canvas/acti
 import { PAINT_COLORS, SIZE_DEFAULT, TOOLS } from "../canvas/palette";
 import { Icon } from "../components/Icons";
 import Chat from "../components/Chat";
+import { CLOSE_GUESS_TEXT } from "../hooks/useGame";
 import Avatar from "../components/Avatar";
 import YouTag from "../components/YouTag";
 import { Sparkles, PAGE_SPARKLES } from "../components/Critter";
@@ -224,6 +225,8 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
     const onDrawStroke = (d) => {
       if (watchRef.current) playStroke(d); // ใช้ ref ที่ตั้งทันทีตอน ai_draw_start (phaseRef ยังไม่ทันอัปเดตตอนเส้นแรกมาถึง)
     };
+    // ช่วง 2 ทายผิดแต่ใกล้มาก — บรรทัดส่วนตัว "ใกล้แล้ว!" ต่อท้ายคำที่ทายผิด (server ไม่ส่งคำตอบมา)
+    const onCloseGuess = () => setWrongAnswers((w) => [...w, { close: true, text: CLOSE_GUESS_TEXT }]);
     const onDrawReply = (d) => {
       if (!d?.correct) setWrongAnswers((w) => [...w, String(d?.text ?? "")]);
     };
@@ -259,6 +262,7 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
     socket.on("ai_draw_start", onDrawStart);
     socket.on("ai_draw_stroke", onDrawStroke);
     socket.on("ai_draw_reply", onDrawReply);
+    socket.on("close_guess", onCloseGuess);
     socket.on("ai_draw_end", onDrawEnd);
     socket.on("ai_game_end", onGameEnd);
     socket.on("game_error", onError);
@@ -269,6 +273,7 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
       socket.off("ai_draw_start", onDrawStart);
       socket.off("ai_draw_stroke", onDrawStroke);
       socket.off("ai_draw_reply", onDrawReply);
+      socket.off("close_guess", onCloseGuess);
       socket.off("ai_draw_end", onDrawEnd);
       clearStrokes();
       socket.off("ai_game_end", onGameEnd);
@@ -736,7 +741,7 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
                 key="watch"
                 title="คำตอบ"
                 emptyText="พิมพ์ทายว่าภาพนี้คืออะไร"
-                messages={wrongAnswers.map((text) => ({ name: name || "คุณ", text, playerId: "me" }))}
+                messages={wrongAnswers.map((x) => (typeof x === "string" ? { name: name || "คุณ", text: x, playerId: "me" } : x))}
                 meId="me"
                 disabled={phase !== "watch"}
                 disabledPlaceholder="รอสักครู่..."

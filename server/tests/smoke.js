@@ -3465,6 +3465,103 @@ async function main() {
     S.socket.disconnect();
   });
 
+  await runPart("40.5 ตัวช่วยทาย: aliases (ทรัมเป็ต · ทอร์นาโด · อังกฤษ) · ใกล้แล้ว (close_guess) ส่งเฉพาะคนทาย ไม่รั่ว", async () => {
+    const answers = require("../answers");
+    const wordsFile = JSON.parse(fs.readFileSync(path.join(SERVER_DIR, "data", "words.json"), "utf8"));
+    const aiFile = JSON.parse(fs.readFileSync(path.join(SERVER_DIR, "data", "ai-words.json"), "utf8"));
+    for (const l in wordsFile) for (const x of wordsFile[l]) answers.register(x.word, x.aliases);
+    for (const l in aiFile) for (const x of aiFile[l]) answers.register(x.word, [x.en, ...(x.aliases || [])]);
+    // --- ระดับฟังก์ชัน ---
+    check("ทรัมเป็ต รับ ทรัมเป็ท ทรัมเปต ทรัมเป๊ต trumpet TRUMPET", ["ทรัมเป็ท", "ทรัมเปต", "ทรัมเป๊ต", "trumpet", "TRUMPET", "ทรัม เป็ต", "ทรัม​เป็ต"].map((g) => answers.isCorrect(g, "ทรัมเป็ต")), [true, true, true, true, true, true, true]);
+    check("พายุทอร์นาโด รับ ทอร์นาโด ทอนาโด tornado", ["ทอร์นาโด", "ทอนาโด", "tornado", "Tornado"].map((g) => answers.isCorrect(g, "พายุทอร์นาโด")), [true, true, true, true]);
+    check("ทอร์นาโด (Solo) รับ ทอนาโด tornado พายุทอร์นาโด", ["ทอนาโด", "tornado", "พายุทอร์นาโด"].map((g) => answers.isCorrect(g, "ทอร์นาโด")), [true, true, true]);
+    check("ภาษาอังกฤษ: แมว=cat · หอไอเฟล=The Eiffel Tower · เสื้อยืด=t-shirt", [answers.isCorrect("cat", "แมว"), answers.isCorrect("eiffel tower", "หอไอเฟล"), answers.isCorrect("T Shirt", "เสื้อยืด")], [true, true, true]);
+    check("วรรณยุกต์ต่างแล้วความหมายเปลี่ยน ไม่นับว่าถูก (หมอ/หม้อ · กลอง/กล้องถ่ายรูป · เสือ/เสื้อ)", [answers.isCorrect("หมอ", "หม้อ"), answers.isCorrect("กลอง", "กล้องถ่ายรูป"), answers.isCorrect("เสือ", "เสื้อ")], [false, false, false]);
+    check("ใกล้: ทรัมเปด/ทรัมเป็ต · ทอร์นาโล/พายุทอร์นาโด · หมอ/หม้อ = ใกล้ · กาแฟ = ไม่ใกล้ · ทายถูกไม่นับว่าใกล้", [answers.isClose("ทรัมเปด", "ทรัมเป็ต"), answers.isClose("ทอร์นาโล", "พายุทอร์นาโด"), answers.isClose("หมอ", "หม้อ"), answers.isClose("กาแฟ", "ทรัมเป็ต"), answers.isClose("trumpet", "ทรัมเป็ต")], [true, true, true, false, false]);
+    check("คำสั้นไม่บอกใกล้ (งู/งุ)", answers.isClose("งุ", "งู"), false);
+    // --- ห้องปกติผ่าน socket: alias นับว่าถูก · ใกล้ส่งเฉพาะคนทาย ---
+    const aliasOf = (w) => Object.values(wordsFile).flat().find((x) => x.word === w)?.aliases?.[0];
+    const near = (w) => { const cs = [...w]; for (const ch of ["ฮ", "ฬ", "x"]) { const v = [...cs.slice(0, -1), ch].join(""); if (answers.isClose(v, w)) return v; } return null; };
+    const H = track(await connect()), A = track(await connect()), B = track(await connect());
+    const made = await emitAck(H.socket, "create_room", { name: "Helper405", avatar: 0, rounds: 1, drawTime: 60 });
+    await emitAck(A.socket, "join_room", { code: made.code, name: "GuessA405", avatar: 1 });
+    await emitAck(B.socket, "join_room", { code: made.code, name: "GuessB405", avatar: 2 });
+    H.socket.emit("start_game");
+    const drawerRec = await Promise.race([H, A, B].map((P) => P.wait("choose_word", null, 6000).then(() => P)));
+    const cw = drawerRec.dump().filter((e) => e.name === "choose_word").at(-1).args[0];
+    const word = cw.options.find((w) => near(w) && aliasOf(w)) || cw.options.find((w) => aliasOf(w));
+    drawerRec.socket.emit("word_chosen", { word });
+    await new Promise((r) => setTimeout(r, 400));
+    const [g1, g2] = [H, A, B].filter((P) => P !== drawerRec);
+    clearAll(H, A, B);
+    const v = near(word);
+    if (v) {
+      g1.socket.emit("guess", { text: v });
+      await new Promise((r) => setTimeout(r, 400));
+      check(`ห้อง: ทาย "${v}" (ใกล้ ${word}) → คนทายได้ close_guess 1 ครั้ง ข้อมูลว่าง`, g1.dump().filter((e) => e.name === "close_guess").map((e) => e.args[0]), [{}]);
+      checkOk("ห้อง: คนวาดและคนทายอีกคนไม่ได้ close_guess", !drawerRec.dump().some((e) => e.name === "close_guess") && !g2.dump().some((e) => e.name === "close_guess"));
+      for (let i = 0; i < 4; i++) g1.socket.emit("guess", { text: v });
+      await new Promise((r) => setTimeout(r, 400));
+      checkOk("ห้อง: close_guess จำกัด 3 ครั้ง/15 วิ", g1.dump().filter((e) => e.name === "close_guess").length === 3);
+    } else console.log("   ⚠️  ข้ามเช็คใกล้ในห้อง: ตัวเลือกคำตานี้สั้นเกินไป");
+    const alias = aliasOf(word);
+    g2.socket.emit("guess", { text: alias });
+    const cg = await g2.wait("correct_guess", null, 3000).catch(() => null);
+    check(`ห้อง: ทายด้วย alias "${alias}" ของ "${word}" → ถูก`, cg?.playerId !== undefined, true);
+    const allEv = JSON.stringify([H, A, B].map((P) => P.dump().filter((e) => e.name !== "your_word" && e.name !== "choose_word" && e.name !== "round_end").map((e) => e.args)));
+    const aliasesOfWord = Object.values(wordsFile).flat().find((x) => x.word === word)?.aliases || [];
+    checkOk("ห้อง: ไม่มีคำตอบ/aliases ของคำนี้ใน event ใด (ยกเว้นคำที่ผู้เล่นพิมพ์เอง)", ![word, ...aliasesOfWord.filter((a) => a !== alias)].some((x) => allEv.includes(`"${x}"`)));
+    for (const P of [H, A, B]) P.socket.disconnect();
+    // --- โหมดทีม: alias ถูก · close_guess ไม่ถึงเพื่อนร่วมทีม/ทีมอื่น ---
+    const T = []; for (let i = 0; i < 4; i++) T.push(track(await connect()));
+    const tm = await emitAck(T[0].socket, "create_room", { name: "Team405a", avatar: 0, mode: "team", rounds: 1, drawTime: 60 });
+    for (let i = 1; i < 4; i++) await emitAck(T[i].socket, "join_room", { code: tm.code, name: "Team405" + "bcd"[i - 1], avatar: i });
+    T[0].socket.emit("start_game");
+    await new Promise((r) => setTimeout(r, 600));
+    const tDrawers = T.filter((P) => P.dump().some((e) => e.name === "choose_word"));
+    const tcw = tDrawers[0].dump().find((e) => e.name === "choose_word").args[0];
+    const tword = tcw.options.find((w) => near(w) && aliasOf(w)) || tcw.options.find((w) => aliasOf(w));
+    tDrawers[0].socket.emit("word_chosen", { word: tword });
+    await new Promise((r) => setTimeout(r, 400));
+    const tGuessers = T.filter((P) => !tDrawers.includes(P));
+    clearAll(...T);
+    const tv = near(tword);
+    if (tv) {
+      tGuessers[0].socket.emit("guess", { text: tv });
+      await new Promise((r) => setTimeout(r, 400));
+      checkOk("ทีม: close_guess ถึงเฉพาะคนทาย ไม่ถึงคนวาด/ทีมอื่น", tGuessers[0].dump().filter((e) => e.name === "close_guess").length === 1 && T.filter((P) => P !== tGuessers[0]).every((P) => !P.dump().some((e) => e.name === "close_guess")));
+    }
+    tGuessers[1].socket.emit("guess", { text: aliasOf(tword) });
+    const tcg = await tGuessers[1].wait("correct_guess", (e) => e.playerId, 3000).catch(() => null);
+    checkOk(`ทีม: alias "${aliasOf(tword)}" นับว่าถูก`, !!tcg);
+    for (const P of T) P.socket.disconnect();
+    // --- Solo ช่วง 2: ภาพมีแค่ trumpet → คำตอบคือ ทรัมเป็ต ---
+    const URL2 = "http://localhost:3001";
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "jdi-helper-"));
+    const fixture = path.join(dir, "ai-drawings.json");
+    fs.writeFileSync(fixture, JSON.stringify({ trumpet: [[[0.2, 0.2, 0.5, 0.3, 0.8, 0.2], [0.3, 0.5, 0.7, 0.5]]] }));
+    const srv = spawn(process.execPath, ["index.js"], { cwd: SERVER_DIR, stdio: "ignore", env: { ...process.env, SCORES_FILE, PORT: "3001", AI_MODE: "mock", AI_MOCK_CHANCE: "0", AI_TIME_OVERRIDE: "3", AI_NEXT_DELAY_MS: "300", AI_DRAWINGS_FILE: fixture } });
+    try {
+      let up = false;
+      for (let i = 0; i < 100 && !up; i++) { up = await fetch(`${URL2}/test.html`).then((r) => r.ok).catch(() => false); if (!up) await new Promise((r) => setTimeout(r, 100)); }
+      for (const [label, guess] of [["ทรัมเป๊ต (สะกดต่าง)", "ทรัมเป๊ต"], ["trumpet (อังกฤษ)", "trumpet"]]) {
+        const S = track(await connect(URL2));
+        S.socket.emit("ai_start", { name: "Solo405" + label.length, difficulty: "hard" });
+        await S.wait("ai_draw_start", null, 8000);
+        S.socket.emit("ai_draw_guess", { text: "ทรัมเปด" });
+        await new Promise((r) => setTimeout(r, 400));
+        const before = JSON.stringify(S.dump().filter((e) => e.name !== "ai_round_start" && e.name !== "ai_round_end").map((e) => e.args));
+        check(`Solo ช่วง 2: ทาย "ทรัมเปด" → close_guess {} (ไม่มีคำตอบ)`, S.dump().filter((e) => e.name === "close_guess").map((e) => e.args[0]), [{}]);
+        checkOk("Solo ช่วง 2: ไม่มีคำว่า ทรัมเป็ต/trumpet ใน event ก่อนจบช่วง", !before.includes("ทรัมเป็ต") && !before.includes("trumpet"));
+        await new Promise((r) => setTimeout(r, 350));
+        S.socket.emit("ai_draw_guess", { text: guess });
+        const de = await S.wait("ai_draw_end", null, 3000).catch(() => null);
+        check(`Solo ช่วง 2: ทาย ${label} → ถูก`, de?.correct, true);
+        S.socket.disconnect();
+      }
+    } finally { srv.kill(); await new Promise((r) => setTimeout(r, 300)); fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
   await runPart("41. ตรวจชื่อไม่สุภาพทุกทาง และยุบตัวอักษรหลบเลี่ยง", async () => {
     const { isNameAllowed } = require("../clean");
     const passNames = ["peacock", "Cocktail", "Scunthorpe", "ฟักทอง", "สาธิต"];

@@ -61,6 +61,8 @@ function emptyGame() {
  */
 // จำกัดความถี่การทายตัวเดียวกับ server (GUESS_MAX / GUESS_WINDOW_MS ใน server/index.js) — ใช้แค่บอกผู้เล่น
 // server ยังเป็นคนตัดสินและทิ้งเงียบเหมือนเดิม ฝั่งนี้แค่ไม่ส่งข้อความที่ server จะทิ้งอยู่แล้ว แล้วโชว์ Toast
+// ข้อความ "ใกล้แล้ว" (ตายตัวที่หน้าเว็บ — server ไม่ส่งข้อความมาเลย จึงไม่มีทางมีคำตอบปน)
+export const CLOSE_GUESS_TEXT = "ใกล้แล้ว! ลองเช็กคำที่พิมพ์อีกที";
 const GUESS_MAX = 10;
 const GUESS_WINDOW_MS = 5000;
 
@@ -211,6 +213,8 @@ export function useGame({ onRateLimited } = {}) {
       }));
 
     const onChat = (msg) => setGame((g) => ({ ...g, messages: [...g.messages, msg] }));
+    // ทายผิดแต่ใกล้มาก — server ส่งถึงเราคนเดียว (ไม่มีคำตอบใน event) ขึ้นเป็นบรรทัดส่วนตัวในกล่องคำตอบ
+    const onCloseGuess = () => setGame((g) => ({ ...g, messages: [...g.messages, { close: true, text: CLOSE_GUESS_TEXT }] }));
 
     // ทายถูก: เก็บ id ไว้ขึ้น ✅ ที่แถบรายชื่อ และเพิ่มข้อความระบบไว้กล่อง "ในห้อง"
     // server ไม่ได้ส่งข้อความระบบนี้มา (ส่งมาแค่ id กับชื่อ) จึงประกอบเองฝั่งนี้
@@ -321,6 +325,7 @@ export function useGame({ onRateLimited } = {}) {
     socket.on("round_end", onRoundEnd);
     socket.on("game_end", onGameEnd);
     socket.on("chat_message", onChat);
+    socket.on("close_guess", onCloseGuess);
     socket.on("correct_guess", onCorrectGuess);
     socket.on("room_update", onRoomUpdate);
 
@@ -340,6 +345,7 @@ export function useGame({ onRateLimited } = {}) {
       socket.off("round_end", onRoundEnd);
       socket.off("game_end", onGameEnd);
       socket.off("chat_message", onChat);
+      socket.off("close_guess", onCloseGuess);
       socket.off("correct_guess", onCorrectGuess);
       socket.off("room_update", onRoomUpdate);
     };

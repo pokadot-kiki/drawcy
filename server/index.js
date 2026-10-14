@@ -399,7 +399,10 @@ function handleTeamGuess(socket, room, player, text) {
     for (const id of [lane.drawerId, ...lane.guessedIds]) io.to(id).emit("chat_message", msg);
     return;
   }
-  if (!answers.isCorrect(text, room.word)) return void io.to(lane.code).emit("chat_message", msg); // ทายผิด เห็นแค่ในทีม
+  if (!answers.isCorrect(text, room.word)) {
+    io.to(lane.code).emit("chat_message", msg); // ทายผิด เห็นแค่ในทีม
+    return void sendCloseHint(socket, text, room.word);
+  }
 
   lane.guessedIds.add(socket.data.pid);
   if (!lane.solved) {
@@ -674,6 +677,16 @@ function challengeAllowsFill(room, color) {
 //   shapes_only → อนุญาต (เป็นเครื่องมือเดียวที่ใช้ได้ในโหมดนี้) · ตกผ่าน challengeAllowsFill เป็น true
 function challengeAllowsShape(room, color) {
   return challengeAllowsFill(room, color);
+}
+
+// "ใกล้แล้ว!" — ทายผิดแต่ห่างจากคำตอบแค่ 1–2 ตัวอักษร บอก "เฉพาะคนที่ทาย" ผ่าน socket ของเขาเอง
+// ⚠️ ไม่มีคำตอบ/ส่วนของคำตอบใน event · ไม่ส่งถึงห้อง/คนวาด · จำกัด 3 ครั้งต่อ 15 วิ (rateOk) กันไล่เดาทีละตัว
+const CLOSE_HINT_MAX = 3;
+const CLOSE_HINT_WINDOW_MS = 15000;
+function sendCloseHint(socket, text, word) {
+  if (!answers.isClose(text, word)) return;
+  if (!rateOk(socket, "close", CLOSE_HINT_MAX, CLOSE_HINT_WINDOW_MS)) return;
+  socket.emit("close_guess", {});
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -1423,6 +1436,7 @@ function handleSoloGuess(socket, data) {
   if (answers.isCorrect(text, solo.guessWord)) return endDrawRound(solo, true);
   solo.replies.push(text);
   emitSolo(solo, "ai_draw_reply", { text, correct: false });
+  sendCloseHint(socket, text, solo.guessWord);
 }
 
 // จบเกม: server บันทึกคะแนนเอง (client ส่งคะแนนมาไม่ได้) แล้วบอกอันดับ
@@ -1813,8 +1827,9 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // ทายผิด ทุกคนเห็นได้
+    // ทายผิด ทุกคนเห็นได้ · ผิดแต่ใกล้มาก บอกเฉพาะคนนี้คนเดียว
     io.to(room.code).emit("chat_message", msg);
+    sendCloseHint(socket, text, room.word);
   });
 
   // ══════════════════════════════════════════════════════════════════

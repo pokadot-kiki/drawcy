@@ -4903,3 +4903,12 @@ select[class] {
     height: 44px;
   }
 }
+
+/* "ใกล้แล้ว!" — บรรทัดส่วนตัวในกล่องคำตอบ (เห็นแค่คนที่ทาย) พื้นเหลืองอ่อน ตัวหนา ข้อความยาวตัดบรรทัดได้ไม่ล้นจอ */
+.chat__row--close {
+  border-color: var(--yellow);
+  background: #fff6cf;
+  color: var(--ink);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
