@@ -20,7 +20,12 @@ const REMOTE_KEY = "jdi:scores:v1";
 const REMOTE_TIMEOUT_MS = 5000;
 const REMOTE_RETRY_MS = 5000;
 const TOP_LIMIT = 20;
-const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/; // YYYY-MM เดือน 01-12 เท่านั้น
+// Leaderboard แสดงเฉพาะ "เดือนนี้ของปีนี้" ตามเวลาไทย (ไม่มีตลอดกาล/ย้อนหลังแล้ว) · ขึ้นเดือนใหม่ตารางเริ่มว่างเอง
+// ข้อมูลเก่ายังเก็บอยู่ครบ แค่ไม่แสดง · ใช้เขตเวลาไทยตรงๆ ไม่ขึ้นกับเขตเวลาของเครื่อง server (Render = UTC)
+const TIME_ZONE = "Asia/Bangkok";
+const BANGKOK = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+});
 // สองกระดานแยกกัน: "solo" = แข่งกับ AI · "multi" = เล่นกับเพื่อนในห้อง
 // เก็บในที่เดียวกัน (ไฟล์/Upstash ก้อนเดิม) แยกด้วยช่อง board ของแต่ละแถว · แถวเก่าที่ไม่มีช่องนี้ = solo
 const BOARDS = ["solo", "multi"];
@@ -167,10 +172,22 @@ function backupIfBroken() {
   console.warn(`scores.json เสีย — เก็บสำรองไว้ที่ ${path.basename(backup)} แล้วเริ่มรายการใหม่`);
 }
 
-// เวลาท้องถิ่นของ server แบบ "2026-10-05 20:14" ตาม events.md
+// แยกวันเวลาตามเวลาไทย → { year, month, day, hour, minute } เป็นข้อความเติมศูนย์แล้ว
+function bangkokParts(date) {
+  const parts = Object.fromEntries(BANGKOK.formatToParts(date).map((x) => [x.type, x.value]));
+  return parts;
+}
+
+// เวลาไทยแบบ "2026-10-05 20:14" ตาม events.md (เดิมใช้เวลาเครื่อง server ซึ่งบน Render คือ UTC)
 function formatPlayedAt(date) {
-  const p = (n) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(date.getHours())}:${p(date.getMinutes())}`;
+  const t = bangkokParts(date);
+  return `${t.year}-${t.month}-${t.day} ${t.hour}:${t.minute}`;
+}
+
+// "YYYY-MM" ของเดือนปัจจุบันตามเวลาไทย — เดือนเดียวที่ Leaderboard แสดง
+function currentMonth(now = new Date()) {
+  const t = bangkokParts(now);
+  return `${t.year}-${t.month}`;
 }
 
 // ตัวเลขจากภายนอก → จำนวนเต็มไม่ติดลบ (ค่าเพี้ยนเป็น 0)
@@ -212,10 +229,6 @@ function saveScore({ name, score, levelReached, board, avatar, nameOwnerKey } = 
   }
 }
 
-function isValidMonth(month) {
-  return typeof month === "string" && MONTH_RE.test(month);
-}
-
 // เทียบแถวสองแถว: คะแนนมากก่อน → ด่านไกลกว่าก่อน → เล่นก่อนได้เปรียบ → id น้อยกว่า
 function compareRows(a, b) {
   return (
@@ -227,21 +240,22 @@ function compareRows(a, b) {
 }
 
 // หนึ่งชื่อหนึ่งแถว: เอาเกมที่ดีที่สุดของแต่ละชื่อ (ชื่อตรงกันทุกตัวอักษรนับเป็นคนเดียวกัน)
-// เรียงตามกติกาเดียวกับ compareRows · month = "YYYY-MM" หรือ null (ตลอดกาล)
-// ถ้าใส่ month จะเลือก "เกมที่ดีที่สุดในเดือนนั้น" ไม่ใช่ของตลอดกาล
-function bestPerName(month = null, board = "solo") {
+// เรียงตามกติกาเดียวกับ compareRows · month = "YYYY-MM" (มีปีเสมอ จึงไม่ปนกับเดือนเดียวกันของปีอื่น)
+// เลือก "เกมที่ดีที่สุดในเดือนนั้น" ของแต่ละชื่อ
+function bestPerName(month, board = "solo") {
   const best = new Map();
   for (const r of loadScores()) {
     if (boardOf(r) !== board) continue; // คนละกระดาน ไม่เอามาปนกัน
-    if (month && !r.playedAt.startsWith(month + "-")) continue;
+    if (!r.playedAt.startsWith(month + "-")) continue; // คนละเดือน (หรือเดือนเดียวกันแต่คนละปี) ไม่แสดง
     const cur = best.get(r.name);
     if (!cur || compareRows(r, cur) < 0) best.set(r.name, r);
   }
   return [...best.values()].sort(compareRows);
 }
 
-// 20 อันดับแรก · อันดับไม่ซ้ำกัน นับ 1, 2, 3...
-function getLeaderboard(month = null, board = "solo") {
+// 20 อันดับแรกของ "เดือนนี้" (เวลาไทย) · อันดับไม่ซ้ำกัน นับ 1, 2, 3... · now ใส่ได้เพื่อเทสขอบเดือน
+function getLeaderboard(board = "solo", now = new Date()) {
+  const month = currentMonth(now);
   return {
     month,
     board,
@@ -252,14 +266,14 @@ function getLeaderboard(month = null, board = "solo") {
   };
 }
 
-// อันดับตลอดกาลของเกมหนึ่งเกม = 1 + จำนวน "คนอื่น" ที่เกมดีที่สุดของเขาดีกว่าหรือเท่าเกมนี้
-// (เท่ากันทุกอย่าง คนที่ทำได้ก่อนอยู่เหนือ) ใช้ตอนจบเกม Solo หลัง saveScore แล้ว
-function rankOf({ name, score, levelReached }) {
+// อันดับเดือนนี้ (กระดาน solo) ของเกมหนึ่งเกม = 1 + จำนวน "คนอื่น" ที่เกมดีที่สุดเดือนนี้ดีกว่าหรือเท่าเกมนี้
+// (เท่ากันทุกอย่าง คนที่ทำได้ก่อนอยู่เหนือ) ใช้ตอนจบเกม Solo หลัง saveScore แล้ว — ตรงกับตัวเลขในหน้า Leaderboard
+function rankOf({ name, score, levelReached }, now = new Date()) {
   const me = { name: cleanName(name), score: cleanCount(score), levelReached: cleanCount(levelReached) };
-  const ahead = bestPerName(null).filter(
+  const ahead = bestPerName(currentMonth(now), "solo").filter(
     (r) => r.name !== me.name && (r.score > me.score || (r.score === me.score && r.levelReached >= me.levelReached))
   );
   return ahead.length + 1;
 }
 
-module.exports = { init, flush, SCORES_FILE, saveScore, getLeaderboard, rankOf, isValidMonth, isValidBoard, loadScores, writeScores, formatPlayedAt, canUseName, normalizeOwnerName };
+module.exports = { init, flush, SCORES_FILE, saveScore, getLeaderboard, rankOf, currentMonth, TIME_ZONE, isValidBoard, loadScores, writeScores, formatPlayedAt, canUseName, normalizeOwnerName };

@@ -99,18 +99,13 @@ app.get("/healthz", (req, res) => res.type("text").send("ok"));
 app.use(express.static(__dirname + "/public"));
 
 // ---------- Leaderboard (HTTP ธรรมดา ไม่ใช่ Socket.IO เพราะขอดูครั้งเดียว ไม่ต้องสด) ----------
-// ไม่ใส่ month = ตลอดกาล · ใส่แล้วต้องเป็น YYYY-MM ไม่งั้นตอบ 400
-// (ถ้าส่ง month มาสองครั้ง จะได้เป็น array ซึ่งก็ไม่ผ่าน isValidMonth → 400 เหมือนกัน)
+// แสดงเฉพาะเดือนนี้ตามเวลาไทยเสมอ (server เป็นคนเลือกเดือน) · ไม่รับ month แล้ว ส่งมาก็ไม่มีผล ดูย้อนหลังไม่ได้
 app.get("/api/leaderboard", (req, res) => {
-  const month = req.query.month;
-  if (month !== undefined && !leaderboard.isValidMonth(month)) {
-    return res.status(400).json({ error: "INVALID_MONTH" });
-  }
   // board = "solo" (แข่งกับ AI · ค่าเริ่มต้น) | "multi" (เล่นกับเพื่อน) — สองกระดานแยกกัน ไม่ปนคะแนนกัน
   const board = req.query.board ?? "solo";
   if (!leaderboard.isValidBoard(board)) return res.status(400).json({ error: "INVALID_BOARD" });
   try {
-    res.json(leaderboard.getLeaderboard(month ?? null, board));
+    res.json(leaderboard.getLeaderboard(board));
   } catch (err) {
     console.warn("ดึง leaderboard ไม่สำเร็จ:", err.message);
     res.status(500).json({ error: "SERVER_ERROR" });

@@ -1287,57 +1287,85 @@ async function main() {
     check("ล้างจอแล้วก็ยังวาดต่อไม่ได้", (await guesser.quiet("stroke_start", 600)).length, 0);
   });
 
-  await runPart("19. Leaderboard API — รูปแบบ · เรียง · กรองเดือน · month ผิด · ไฟล์หาย/เสีย", async () => {
+  await runPart("19. Leaderboard API — เดือนนี้ (เวลาไทย) เท่านั้น · รูปแบบ · เรียง · ไม่มีย้อนหลัง · ไฟล์หาย/เสีย", async () => {
+    const lb = require("../leaderboard");
+    const cur = lb.currentMonth();
+    const [cy, cm] = cur.split("-").map(Number);
+    const prev = cm === 1 ? `${cy - 1}-12` : `${cy}-${String(cm - 1).padStart(2, "0")}`;
+    const lastYear = `${cy - 1}-${String(cm).padStart(2, "0")}`; // เดือนเดียวกัน คนละปี
     // ไฟล์ยังไม่มี → ได้รายการว่าง ไม่ล่ม
     fs.rmSync(SCORES_FILE, { force: true });
     let r = await getBoard();
-    check("ไฟล์ยังไม่มี → 200 และรายการว่าง", [r.status, r.body], [200, { month: null, board: "solo", top: [] }]);
+    check("ไฟล์ยังไม่มี → 200 รายการว่าง และ month = เดือนนี้", [r.status, r.body], [200, { month: cur, board: "solo", top: [] }]);
 
-    // 25 แถวเดือน 2026-09 (เกิน 20 เพื่อเทสการตัด) + 3 แถวเดือนอื่น + แถวหน้าตาเพี้ยน 2 แถว
+    // 25 แถวเดือนนี้ (เกิน 20 เพื่อเทสการตัด) + เดือนก่อน + เดือนเดียวกันปีก่อน + แถวหน้าตาเพี้ยน 2 แถว
     const rows = [];
     for (let i = 0; i < 25; i++) {
-      rows.push({ id: i + 1, name: `P${i}`, score: (i * 37) % 500, levelReached: 1 + (i % 9), playedAt: `2026-09-${String(1 + i).padStart(2, "0")} 20:00` });
+      rows.push({ id: i + 1, name: `P${i}`, score: (i * 37) % 500, levelReached: 1 + (i % 9), playedAt: `${cur}-${String(1 + i).padStart(2, "0")} 20:00` });
     }
-    rows.push({ id: 26, name: "Tar", score: 9999, levelReached: 9, playedAt: "2026-10-02 10:00" });
-    rows.push({ id: 27, name: "เสมอด่านน้อย", score: 800, levelReached: 3, playedAt: "2026-08-01 10:00" });
-    rows.push({ id: 28, name: "เสมอด่านมาก", score: 800, levelReached: 5, playedAt: "2026-08-02 10:00" });
-    rows.push({ id: 29, name: 123, score: "x" }); // แถวเสีย ต้องถูกทิ้ง
+    rows.push({ id: 26, name: "เดือนก่อน", score: 9999, levelReached: 9, playedAt: `${prev}-02 10:00` });
+    rows.push({ id: 27, name: "ปีก่อน", score: 99999, levelReached: 9, playedAt: `${lastYear}-03 10:00` });
+    rows.push({ id: 28, name: "เสมอด่านน้อย", score: 800, levelReached: 3, playedAt: `${cur}-01 10:00` });
+    rows.push({ id: 29, name: "เสมอด่านมาก", score: 800, levelReached: 5, playedAt: `${cur}-02 10:00` });
+    rows.push({ id: 30, name: 123, score: "x" }); // แถวเสีย ต้องถูกทิ้ง
     rows.push(null);
     fs.writeFileSync(SCORES_FILE, JSON.stringify(rows));
 
     r = await getBoard();
-    check("ตลอดกาล → 200 และ month เป็น null", [r.status, r.body?.month], [200, null]);
-    check("ตลอดกาล ส่งแค่ 20 อันดับ", r.body.top.length, 20);
-    check("แต่ละแถวมีแค่ rank name score levelReached avatar (เพิ่ม avatar ใน bug-sweep)",
+    check("ไม่ใส่อะไร → 200 และ month = เดือนนี้", [r.status, r.body?.month], [200, cur]);
+    check("ส่งแค่ 20 อันดับ", r.body.top.length, 20);
+    check("แต่ละแถวมีแค่ rank name score levelReached avatar",
       r.body.top.every((t) => JSON.stringify(Object.keys(t)) === '["rank","name","score","levelReached","avatar"]'), true);
     check("rank เรียง 1..20", r.body.top.map((t) => t.rank), Array.from({ length: 20 }, (_, i) => i + 1));
     checkOk("คะแนนเรียงจากมากไปน้อย", r.body.top.every((t, i, a) => i === 0 || a[i - 1].score >= t.score));
-    check("อันดับ 1 คือคะแนนสูงสุด", r.body.top[0].name, "Tar");
-    check("คะแนนเท่ากัน ด่านไกลกว่าได้อันดับดีกว่า", r.body.top.slice(1, 3).map((t) => t.name), ["เสมอด่านมาก", "เสมอด่านน้อย"]);
+    check("คะแนนเท่ากัน ด่านไกลกว่าได้อันดับดีกว่า", r.body.top.slice(0, 2).map((t) => t.name), ["เสมอด่านมาก", "เสมอด่านน้อย"]);
+    checkOk("คะแนนเดือนก่อนไม่ขึ้น (แม้คะแนนสูงสุด)", !r.body.top.some((t) => t.name === "เดือนก่อน"));
+    checkOk("เดือนเดียวกันแต่ปีก่อนไม่ขึ้นปนกัน", !r.body.top.some((t) => t.name === "ปีก่อน"));
     checkOk("แถวที่หน้าตาเพี้ยนไม่โผล่", r.body.top.every((t) => typeof t.name === "string"));
+    const names = JSON.stringify(r.body.top.map((t) => t.name));
 
-    r = await getBoard("?month=2026-09");
-    check("เดือน 2026-09 → month ตรงกับที่ขอ", [r.status, r.body?.month], [200, "2026-09"]);
-    check("เดือน 2026-09 ตัดเหลือ 20 จาก 25", r.body.top.length, 20);
-    checkOk("เดือน 2026-09 ไม่มีคนของเดือนอื่น", r.body.top.every((t) => /^P\d+$/.test(t.name)));
-    r = await getBoard("?month=2026-08");
-    check("เดือน 2026-08 ได้สองคนที่เล่นเดือนนั้น", r.body.top.map((t) => [t.rank, t.name]), [[1, "เสมอด่านมาก"], [2, "เสมอด่านน้อย"]]);
-    r = await getBoard("?month=2025-01");
-    check("เดือนที่ไม่มีใครเล่น → รายการว่าง", [r.status, r.body], [200, { month: "2025-01", board: "solo", top: [] }]);
-
-    for (const bad of ["2026-13", "2026-00", "2026-9", "26-09", "2026-09-01", "abc", "", "2026-09&month=2026-08", "%3Cscript%3E"]) {
-      r = await getBoard(`?month=${bad}`);
-      check(`month=${bad || "(ว่าง)"} → 400`, [r.status, r.body], [400, { error: "INVALID_MONTH" }]);
+    // ไม่มีทางดูย้อนหลัง: month ที่ส่งมา (ถูกหรือผิดรูปแบบ) ไม่มีผล ได้เดือนนี้เสมอ
+    for (const q of [`?month=${prev}`, `?month=${lastYear}`, "?month=2026-13", "?month=abc", "?month=", "?month=2026-09&month=2026-08"]) {
+      r = await getBoard(q);
+      check(`${q} → 200 เดือนนี้เหมือนเดิม`, [r.status, r.body?.month, JSON.stringify(r.body?.top.map((t) => t.name))], [200, cur, names]);
     }
+    r = await getBoard("?board=xx");
+    check("board ผิด → 400 INVALID_BOARD (เหมือนเดิม)", [r.status, r.body], [400, { error: "INVALID_BOARD" }]);
 
     // ไฟล์เสียระหว่างที่ server เปิดอยู่ → ไม่ล่ม ได้รายการว่าง
     fs.writeFileSync(SCORES_FILE, "{ นี่ไม่ใช่ JSON");
     r = await getBoard();
-    check("ไฟล์ JSON เสีย → 200 และรายการว่าง", [r.status, r.body], [200, { month: null, board: "solo", top: [] }]);
+    check("ไฟล์ JSON เสีย → 200 และรายการว่าง", [r.status, r.body], [200, { month: cur, board: "solo", top: [] }]);
     fs.writeFileSync(SCORES_FILE, JSON.stringify({ not: "array" }));
     r = await getBoard();
     check("ไฟล์เป็น JSON แต่ไม่ใช่ array → รายการว่าง", r.body?.top, []);
     checkOk("server ยังทำงานอยู่หลังเจอไฟล์เสีย", await serverIsUp());
+  });
+
+  await runPart("19.1 Leaderboard ขอบเดือนตามเวลาไทย (Asia/Bangkok ไม่ใช่ UTC)", async () => {
+    const lb = require("../leaderboard");
+    lb.writeScores([
+      { id: 1, name: "สิ้นตุลา", score: 100, levelReached: 1, playedAt: "2026-10-31 23:59" },
+      { id: 2, name: "ต้นพฤศจิกา", score: 200, levelReached: 1, playedAt: "2026-11-01 00:00" },
+      { id: 3, name: "ตุลาปีก่อน", score: 300, levelReached: 1, playedAt: "2025-10-15 10:00" },
+    ]);
+    const at = (iso) => lb.getLeaderboard("solo", new Date(iso));
+    check("31 ต.ค. 23:59:59 เวลาไทย (16:59:59 UTC) → ยังเป็นตุลาคม",
+      [at("2026-10-31T16:59:59Z").month, at("2026-10-31T16:59:59Z").top.map((t) => t.name)], ["2026-10", ["สิ้นตุลา"]]);
+    check("1 พ.ย. 00:00 เวลาไทย (17:00 UTC วันที่ 31) → ขึ้นพฤศจิกายน ตารางเริ่มใหม่",
+      [at("2026-10-31T17:00:00Z").month, at("2026-10-31T17:00:00Z").top.map((t) => t.name)], ["2026-11", ["ต้นพฤศจิกา"]]);
+    check("ตุลาคมปีก่อนเห็นแค่ของปีนั้น (ไม่ปนกับตุลาคมปีนี้)", at("2025-10-20T05:00:00Z").top.map((t) => t.name), ["ตุลาปีก่อน"]);
+    check("ข้ามปี: 31 ธ.ค. 17:00 UTC = 1 ม.ค. เวลาไทย", lb.currentMonth(new Date("2026-12-31T17:00:00Z")), "2027-01");
+    const saved = lb.saveScore({ name: "บันทึกตอนเที่ยงคืน", score: 50, levelReached: 1 }, new Date("2026-10-31T17:30:00Z"));
+    check("saveScore บันทึกเวลาไทย (00:30 วันที่ 1 พ.ย. ไม่ใช่ 17:30 วันที่ 31 ต.ค.)", saved?.playedAt, "2026-11-01 00:30");
+    const inUtc = require("child_process").execFileSync(process.execPath,
+      ["-e", 'process.stdout.write(require("./leaderboard").formatPlayedAt(new Date("2026-10-31T17:30:00Z")))'],
+      { cwd: SERVER_DIR, env: { ...process.env, TZ: "UTC" } }).toString();
+    check("เครื่อง server ตั้งเวลาเป็น UTC (แบบ Render) ก็ยังได้เวลาไทย", inUtc, "2026-11-01 00:30");
+    check("rankOf นับเฉพาะเดือนเดียวกัน (สิ้นตุลาไม่นับในพฤศจิกา)",
+      [lb.rankOf({ name: "ใหม่", score: 150, levelReached: 1 }, new Date("2026-10-31T16:00:00Z")),
+       lb.rankOf({ name: "ใหม่", score: 150, levelReached: 1 }, new Date("2026-11-02T00:00:00Z"))], [1, 2]);
+    fs.rmSync(SCORES_FILE, { force: true });
   });
 
   await runPart("20. saveScore — บันทึกปลอดภัย · ตัดชื่อ · ไฟล์เสียแล้วเริ่มใหม่", async () => {
@@ -1358,8 +1386,8 @@ async function main() {
     check("ชื่อที่หน้าตาเป็น HTML เก็บเป็นข้อความเดิม ไม่แปลงอะไร",
       saveScore({ name: "<b>x</b>", score: 1, levelReached: 1 })?.name, "<b>x</b>");
 
-    const month = first.playedAt.slice(0, 7);
-    const r = await getBoard(`?month=${month}`);
+    check("playedAt อยู่ในเดือนนี้ตามเวลาไทย", first.playedAt.slice(0, 7), require("../leaderboard").currentMonth());
+    const r = await getBoard();
     check("API เห็นคะแนนที่เพิ่งบันทึก เรียงถูก", r.body?.top.map((t) => t.name), ["Mew", "ชื่อยาวมากเกินยี่สิบตัวอักษรแน่นอน".slice(0, 20), "<b>x</b>"]);
     check("ไม่มีไฟล์ชั่วคราวค้าง (.tmp)", fs.readdirSync(SCORES_DIR).filter((f) => f.endsWith(".tmp")), []);
 
@@ -1376,24 +1404,25 @@ async function main() {
   const TINY_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
   const readRows = () => JSON.parse(fs.readFileSync(SCORES_FILE, "utf8"));
 
-  await runPart("21. Leaderboard หนึ่งชื่อหนึ่งแถว · rankOf", async () => {
-    const { rankOf } = require("../leaderboard");
-    const at = (d) => `2026-10-${d} 10:00`;
+  await runPart("21. Leaderboard หนึ่งชื่อหนึ่งแถว · rankOf (เดือนนี้)", async () => {
+    const { rankOf, currentMonth } = require("../leaderboard");
+    const cur = currentMonth();
+    const [cy, cm] = cur.split("-").map(Number);
+    const prev = cm === 1 ? `${cy - 1}-12` : `${cy}-${String(cm - 1).padStart(2, "0")}`;
+    const at = (d) => `${cur}-${d} 10:00`;
     fs.writeFileSync(SCORES_FILE, JSON.stringify([
       { id: 1, name: "Mew", score: 500, levelReached: 3, playedAt: at("01") },
       { id: 2, name: "Mew", score: 1300, levelReached: 6, playedAt: at("02") },
       { id: 3, name: "Mew", score: 900, levelReached: 5, playedAt: at("03") },
       { id: 4, name: "Tar", score: 1300, levelReached: 7, playedAt: at("04") },
-      { id: 5, name: "Joy", score: 700, levelReached: 4, playedAt: "2026-09-10 10:00" },
+      { id: 5, name: "Joy", score: 700, levelReached: 4, playedAt: `${prev}-10 10:00` },
       { id: 6, name: "Joy", score: 100, levelReached: 1, playedAt: at("05") },
+      { id: 7, name: "OldChamp", score: 5000, levelReached: 9, playedAt: `${prev}-11 10:00` },
     ]));
-    let r = await getBoard();
-    check("ตลอดกาล: Mew โผล่แถวเดียวด้วยเกมที่ดีที่สุด",
-      r.body.top.map((t) => [t.rank, t.name, t.score]), [[1, "Tar", 1300], [2, "Mew", 1300], [3, "Joy", 700]]);
-    r = await getBoard("?month=2026-10");
-    check("รายเดือน: เลือกเกมที่ดีที่สุด 'ในเดือนนั้น' (Joy เดือนนี้เหลือ 100)",
-      r.body.top.map((t) => [t.name, t.score]), [["Tar", 1300], ["Mew", 1300], ["Joy", 100]]);
-    check("rankOf: เกม 1500 คะแนนของคนใหม่ได้อันดับ 1", rankOf({ name: "New", score: 1500, levelReached: 1 }), 1);
+    const r = await getBoard();
+    check("เดือนนี้: Mew โผล่แถวเดียวด้วยเกมที่ดีที่สุด · Joy ใช้เกมเดือนนี้ (100) · OldChamp เดือนก่อนไม่ขึ้น",
+      r.body.top.map((t) => [t.rank, t.name, t.score]), [[1, "Tar", 1300], [2, "Mew", 1300], [3, "Joy", 100]]);
+    check("rankOf: เกม 1500 คะแนนของคนใหม่ได้อันดับ 1 (ไม่นับ OldChamp เดือนก่อน)", rankOf({ name: "New", score: 1500, levelReached: 1 }), 1);
     check("rankOf: 1000 คะแนนตามหลัง Tar กับ Mew = อันดับ 3", rankOf({ name: "New", score: 1000, levelReached: 1 }), 3);
     check("rankOf: คะแนนเท่ากันแต่ด่านน้อยกว่า ตามหลังคนเดิม", rankOf({ name: "New", score: 1300, levelReached: 5 }), 3);
     check("rankOf: ไม่นับตัวเอง (Mew 1300/6 ได้อันดับ 2 ไม่ใช่ 3)", rankOf({ name: "Mew", score: 1300, levelReached: 6 }), 2);
@@ -2499,7 +2528,7 @@ async function main() {
 
     // ---- 6) ตัว server จริง (พอร์ต 3001): โหลดคะแนนจาก Upstash ตอนสตาร์ท · /healthz · FORCE_HTTPS · HOST · origin ของ Render ----
     store.set("jdi:scores:v1", JSON.stringify([
-      { id: 1, name: "จาก-Upstash", score: 4321, levelReached: 6, playedAt: "2026-10-05 20:14" },
+      { id: 1, name: "จาก-Upstash", score: 4321, levelReached: 6, playedAt: `${require("../leaderboard").currentMonth()}-05 20:14` },
     ]));
     const month = "2026-10";
     const env = { ...process.env, PORT: "3001", HOST: "127.0.0.1", AI_MODE: "mock", FORCE_HTTPS: "1",
@@ -3428,8 +3457,8 @@ async function main() {
     const keyA = "7".repeat(32), keyB = "8".repeat(32);
     lb.saveScore({ name: "Avatar404", score: 444, levelReached: 3, avatar: 7, nameOwnerKey: keyA });
     lb.saveScore({ name: "AvatarBad404", score: 443, levelReached: 3, avatar: 99, nameOwnerKey: keyA });
-    lb.writeScores([...lb.loadScores(), { id: 99404, name: "AvatarOld404", score: 442, levelReached: 3, playedAt: "2026-01-05 10:00" }]);
-    const top = lb.getLeaderboard(null, "solo").top;
+    lb.writeScores([...lb.loadScores(), { id: 99404, name: "AvatarOld404", score: 442, levelReached: 3, playedAt: `${lb.currentMonth()}-05 10:00` }]);
+    const top = lb.getLeaderboard("solo").top;
     check("saveScore เก็บอวตาร · API ส่ง avatar", top.find((r) => r.name === "Avatar404")?.avatar, 7);
     check("อวตารนอกช่วง (99) → 0", top.find((r) => r.name === "AvatarBad404")?.avatar, 0);
     check("แถวเก่าไม่มีอวตาร → 0 ไม่พัง", top.find((r) => r.name === "AvatarOld404")?.avatar, 0);
@@ -3451,7 +3480,7 @@ async function main() {
       await new Promise((r) => setTimeout(r, 3800));
     }
     await H.wait("game_end", null, 8000);
-    const multi = lb.getLeaderboard(null, "multi").top;
+    const multi = lb.getLeaderboard("multi").top;
     check("จบเกมห้อง: บันทึกอวตารของแต่ละคน", [multi.find((r) => r.name === "AvHost404")?.avatar, multi.find((r) => r.name === "AvGuest404")?.avatar], [5, 9]);
     H.socket.disconnect(); G.socket.disconnect();
     // Solo: ai_start ส่งอวตาร → บันทึกตอนจบเกม
@@ -3460,7 +3489,7 @@ async function main() {
     await S.wait("ai_round_start", null, 3000);
     // ไม่ส่งภาพ → หมดเวลาด่านละ 2 วิ (AI_TIME_OVERRIDE ของ server หลัก) เสียครบ 3 ชีวิตแล้วจบเกม
     await S.wait("ai_game_end", null, 20000).catch(() => null);
-    const solo = lb.getLeaderboard(null, "solo").top.find((r) => r.name === "AvSolo404");
+    const solo = lb.getLeaderboard("solo").top.find((r) => r.name === "AvSolo404");
     check("Solo: บันทึกอวตารจาก ai_start", solo?.avatar ?? "ยังไม่จบเกม", 11);
     S.socket.disconnect();
   });
