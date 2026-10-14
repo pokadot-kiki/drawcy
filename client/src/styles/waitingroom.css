@@ -548,6 +548,7 @@
 
 /* ---- ปุ่มเริ่มเกม / พร้อม ---- */
 .wr-actions {
+  flex-shrink: 0; /* ปุ่มเริ่มเกม/พร้อมไม่ถูกบีบ — ให้รายชื่อ/แชทหดหรือเลื่อนแทน */
   margin-top: auto;
   padding-top: 16px;
   display: grid;
@@ -1210,11 +1211,20 @@
     gap: 6px;
   }
 
-  /* อยู่คนเดียวก็ยังเห็นที่นั่งว่างครบ — ให้รายการเลื่อนในกรอบแทนที่จะดันการ์ดให้ยืด */
-  .wr-card--players.wr-card--waiting > .player-list {
-    flex: 1;
+  /* อยู่คนเดียวก็ยังเห็นที่นั่งว่างครบ — ให้รายการเลื่อนในกรอบแทนที่จะดันการ์ดให้ยืด
+     โหมดทีมก็ต้องเหมือนกัน: เดิมลืม .team-cols ไว้ที่ flex: 0 0 auto + overflow: visible
+     คอลัมน์ทีม 2–4 ทีม + มาสคอต สูงเกินการ์ด จึงดันปุ่มเริ่มเกมหลุดออกนอกการ์ดไปทับหัวกล่องแชท */
+  .wr-card--players.wr-card--waiting > .player-list,
+  .wr-card--players.wr-card--waiting > .team-cols {
+    flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* โหมดทีมมีที่นั่งว่าง "ว่าง" ให้เห็นในทุกคอลัมน์อยู่แล้ว — ซ่อนมาสคอตรอเพื่อน คืนที่ให้ทีมทุกทีมโชว์ครบ */
+  .wr--team .wr-card--players.wr-card--waiting .mascot-note {
+    display: none;
   }
 
   /* คอลัมน์ทีมแคบกว่า ใช้การ์ดเตี้ยลงเล็กน้อย (ยังอยู่ในช่วง 56–68px ที่ต้องการ) */
