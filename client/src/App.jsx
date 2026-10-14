@@ -75,7 +75,7 @@ export default function App() {
     askRedo,
     askHint,
     bindCanvas,
-  } = useGame();
+  } = useGame({ onRateLimited: () => showToast("พิมพ์เร็วเกินไป") });
 
   function showToast(text) {
     setToast({ text, id: Date.now() });

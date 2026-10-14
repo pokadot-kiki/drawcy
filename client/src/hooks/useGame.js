@@ -59,7 +59,14 @@ function emptyGame() {
  * App อยู่ตลอดตั้งแต่เปิดหน้าเว็บ จึงไม่มี event ไหนหลุด
  * (บทเรียนเดียวกับบั๊ก StrictMode ในข้อ 1: event ที่พลาดไปแล้วจะไม่ยิงซ้ำ)
  */
-export function useGame() {
+// จำกัดความถี่การทายตัวเดียวกับ server (GUESS_MAX / GUESS_WINDOW_MS ใน server/index.js) — ใช้แค่บอกผู้เล่น
+// server ยังเป็นคนตัดสินและทิ้งเงียบเหมือนเดิม ฝั่งนี้แค่ไม่ส่งข้อความที่ server จะทิ้งอยู่แล้ว แล้วโชว์ Toast
+const GUESS_MAX = 10;
+const GUESS_WINDOW_MS = 5000;
+
+export function useGame({ onRateLimited } = {}) {
+  const rateRef = useRef({ times: [], onRateLimited });
+  rateRef.current.onRateLimited = onRateLimited;
   const [game, setGame] = useState(emptyGame);
   const [chooseLeft, setChooseLeft] = useState(0);
   const playersRef = useRef(null); // รายชื่อผู้เล่นรอบก่อน ไว้เทียบว่าใครเข้าออก
@@ -390,7 +397,17 @@ export function useGame() {
     askHint,
     bindCanvas,
     chooseWord: (word) => socket.emit("word_chosen", { word }),
-    sendGuess: (text) => socket.emit("guess", { text }),
+    sendGuess: (text) => {
+      const now = Date.now();
+      const times = rateRef.current.times.filter((t) => now - t <= GUESS_WINDOW_MS);
+      rateRef.current.times = times;
+      if (times.length >= GUESS_MAX) {
+        rateRef.current.onRateLimited?.(); // พิมพ์เร็วเกินไป (server จะทิ้งข้อความนี้อยู่แล้ว)
+        return;
+      }
+      times.push(now);
+      socket.emit("guess", { text });
+    },
     startGame: () => socket.emit("start_game"),
     // ออกจากห้องแล้วล้างให้เกลี้ยง ไม่งั้นกลับเข้าห้องใหม่แล้วอาจเห็นของเก่าค้างอยู่แวบหนึ่ง
     resetGame: () => {
