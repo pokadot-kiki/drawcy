@@ -7,6 +7,7 @@
 //   "mock"   = ไม่มีทั้งสองอย่างหรือสั่ง AI_MODE=mock → เดาสุ่มจากคลังคำ ยิ่งผ่านเวลาไปนานยิ่งมีโอกาสถูก
 // โมเดลโหลดไม่ขึ้นหรือพังกลางทาง → ถอยไปสมองถัดไปเอง server ไม่ล่ม
 const fs = require("fs");
+const answers = require("./answers");
 const path = require("path");
 const aiModel = require("./ai-model");
 
@@ -34,6 +35,7 @@ function loadSoloBank() {
         if (!word || !en || seen.has(word)) continue; // คำไทยซ้ำ = กำกวม ข้าม
         seen.add(word);
         bank[level].push({ word, en, category: typeof it.category === "string" ? it.category : "" });
+        answers.register(word, [en, ...(Array.isArray(it.aliases) ? it.aliases : [])]); // ชื่ออังกฤษ + คำที่นับว่าถูก
         thToEn.set(word, en);
       }
     }
@@ -181,7 +183,7 @@ async function guessImage({ image, word, allWords, elapsed, time, wrong }) {
         ? await claudeGuess({ image, wrong })
         : mockGuess({ word, allWords, elapsed, time, wrong });
   }
-  return { guess, correct: sameWord(guess, word) };
+  return { guess, correct: answers.isCorrect(guess, word) }; // รับชื่ออังกฤษ/คำที่นับว่าถูกด้วย (Claude อาจตอบคำพ้อง)
 }
 
 module.exports = { init, soloWords, levelConfig, pickWord, scoreFor, aiMode, guessImage, mockChance, parseImage, sameWord };

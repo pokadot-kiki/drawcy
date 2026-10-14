@@ -3,7 +3,11 @@
     {
       "word": "แอปเปิล",
       "category": "ผลไม้",
-      "en": "apple"
+      "en": "apple",
+      "aliases": [
+        "แอปเปิ้ล",
+        "แอ๊ปเปิ้ล"
+      ]
     },
     {
       "word": "กล้วย",
@@ -38,7 +42,10 @@
     {
       "word": "หมู",
       "category": "สัตว์",
-      "en": "pig"
+      "en": "pig",
+      "aliases": [
+        "pig"
+      ]
     },
     {
       "word": "วัว",
@@ -58,17 +65,27 @@
     {
       "word": "พระอาทิตย์",
       "category": "ธรรมชาติ",
-      "en": "sun"
+      "en": "sun",
+      "aliases": [
+        "ดวงอาทิตย์",
+        "ตะวัน"
+      ]
     },
     {
       "word": "ดาว",
       "category": "ธรรมชาติ",
-      "en": "star"
+      "en": "star",
+      "aliases": [
+        "ดวงดาว"
+      ]
     },
     {
       "word": "เมฆ",
       "category": "ธรรมชาติ",
-      "en": "cloud"
+      "en": "cloud",
+      "aliases": [
+        "ก้อนเมฆ"
+      ]
     },
     {
       "word": "ต้นไม้",
@@ -88,17 +105,28 @@
     {
       "word": "รถยนต์",
       "category": "ยานพาหนะ",
-      "en": "car"
+      "en": "car",
+      "aliases": [
+        "รถ",
+        "รถเก๋ง"
+      ]
     },
     {
       "word": "รถบัส",
       "category": "ยานพาหนะ",
-      "en": "bus"
+      "en": "bus",
+      "aliases": [
+        "รถเมล์",
+        "รถโดยสาร"
+      ]
     },
     {
       "word": "นาฬิกา",
       "category": "สิ่งของ",
-      "en": "clock"
+      "en": "clock",
+      "aliases": [
+        "watch"
+      ]
     },
     {
       "word": "กุญแจ",
@@ -133,12 +161,19 @@
     {
       "word": "แก้วน้ำ",
       "category": "สิ่งของ",
-      "en": "cup"
+      "en": "cup",
+      "aliases": [
+        "แก้ว",
+        "glass"
+      ]
     },
     {
       "word": "ตา",
       "category": "ร่างกาย",
-      "en": "eye"
+      "en": "eye",
+      "aliases": [
+        "ดวงตา"
+      ]
     },
     {
       "word": "หู",
@@ -163,7 +198,10 @@
     {
       "word": "เท้า",
       "category": "ร่างกาย",
-      "en": "foot"
+      "en": "foot",
+      "aliases": [
+        "feet"
+      ]
     },
     {
       "word": "วงกลม",
@@ -173,7 +211,11 @@
     {
       "word": "สี่เหลี่ยม",
       "category": "รูปทรง",
-      "en": "square"
+      "en": "square",
+      "aliases": [
+        "สี่เหลี่ยมจัตุรัส",
+        "rectangle"
+      ]
     },
     {
       "word": "สามเหลี่ยม",
@@ -183,7 +225,12 @@
     {
       "word": "หน้ายิ้ม",
       "category": "รูปทรง",
-      "en": "smiley face"
+      "en": "smiley face",
+      "aliases": [
+        "smiley",
+        "smile",
+        "ยิ้ม"
+      ]
     },
     {
       "word": "ภูเขา",
@@ -193,32 +240,55 @@
     {
       "word": "พิซซ่า",
       "category": "อาหาร",
-      "en": "pizza"
+      "en": "pizza",
+      "aliases": [
+        "พิซซา",
+        "พิชซ่า"
+      ]
     },
     {
       "word": "ไอศกรีม",
       "category": "อาหาร",
-      "en": "ice cream"
+      "en": "ice cream",
+      "aliases": [
+        "ไอติม",
+        "ไอศครีม",
+        "ไอสครีม"
+      ]
     },
     {
       "word": "โดนัท",
       "category": "อาหาร",
-      "en": "donut"
+      "en": "donut",
+      "aliases": [
+        "doughnut",
+        "โดนัต"
+      ]
     },
     {
       "word": "คุกกี้",
       "category": "อาหาร",
-      "en": "cookie"
+      "en": "cookie",
+      "aliases": [
+        "คุ้กกี้"
+      ]
     },
     {
       "word": "รุ้ง",
       "category": "ธรรมชาติ",
-      "en": "rainbow"
+      "en": "rainbow",
+      "aliases": [
+        "รุ้งกินน้ำ"
+      ]
     },
     {
       "word": "เต็นท์",
       "category": "สิ่งของ",
-      "en": "tent"
+      "en": "tent",
+      "aliases": [
+        "เต้นท์",
+        "เต็นต์"
+      ]
     },
     {
       "word": "ประตู",
@@ -233,7 +303,10 @@
     {
       "word": "รองเท้า",
       "category": "เสื้อผ้า",
-      "en": "shoe"
+      "en": "shoe",
+      "aliases": [
+        "shoes"
+      ]
     },
     {
       "word": "ดินสอ",
@@ -265,7 +338,10 @@
     {
       "word": "หมา",
       "category": "สัตว์",
-      "en": "dog"
+      "en": "dog",
+      "aliases": [
+        "สุนัข"
+      ]
     },
     {
       "word": "กบ",
@@ -285,7 +361,10 @@
     {
       "word": "ฝน",
       "category": "ธรรมชาติ",
-      "en": "rain"
+      "en": "rain",
+      "aliases": [
+        "ฝนตก"
+      ]
     },
     {
       "word": "จักรยาน",
@@ -295,7 +374,10 @@
     {
       "word": "เครื่องบิน",
       "category": "ยานพาหนะ",
-      "en": "airplane"
+      "en": "airplane",
+      "aliases": [
+        "plane"
+      ]
     },
     {
       "word": "เรือใบ",
@@ -310,17 +392,29 @@
     {
       "word": "แฮมเบอร์เกอร์",
       "category": "อาหาร",
-      "en": "hamburger"
+      "en": "hamburger",
+      "aliases": [
+        "burger",
+        "เบอร์เกอร์",
+        "แฮมเบอเกอร์"
+      ]
     },
     {
       "word": "เค้กวันเกิด",
       "category": "อาหาร",
-      "en": "birthday cake"
+      "en": "birthday cake",
+      "aliases": [
+        "เค้ก",
+        "cake"
+      ]
     },
     {
       "word": "มนุษย์หิมะ",
       "category": "สิ่งของ",
-      "en": "snowman"
+      "en": "snowman",
+      "aliases": [
+        "ตุ๊กตาหิมะ"
+      ]
     },
     {
       "word": "ถุงเท้า",
@@ -335,27 +429,48 @@
     {
       "word": "โทรทัศน์",
       "category": "สิ่งของ",
-      "en": "television"
+      "en": "television",
+      "aliases": [
+        "ทีวี",
+        "tv"
+      ]
     },
     {
       "word": "มือถือ",
       "category": "สิ่งของ",
-      "en": "cell phone"
+      "en": "cell phone",
+      "aliases": [
+        "โทรศัพท์",
+        "โทรศัพท์มือถือ",
+        "phone",
+        "smartphone"
+      ]
     },
     {
       "word": "โน้ตบุ๊ก",
       "category": "สิ่งของ",
-      "en": "laptop"
+      "en": "laptop",
+      "aliases": [
+        "notebook",
+        "โน้ตบุ๊ค",
+        "คอมพิวเตอร์"
+      ]
     },
     {
       "word": "กล้องถ่ายรูป",
       "category": "สิ่งของ",
-      "en": "camera"
+      "en": "camera",
+      "aliases": [
+        "กล้อง"
+      ]
     },
     {
       "word": "หลอดไฟ",
       "category": "สิ่งของ",
-      "en": "light bulb"
+      "en": "light bulb",
+      "aliases": [
+        "bulb"
+      ]
     },
     {
       "word": "เทียน",
@@ -405,37 +520,62 @@
     {
       "word": "เต่า",
       "category": "สัตว์",
-      "en": "sea turtle"
+      "en": "sea turtle",
+      "aliases": [
+        "turtle"
+      ]
     },
     {
       "word": "หมึกยักษ์",
       "category": "สัตว์",
-      "en": "octopus"
+      "en": "octopus",
+      "aliases": [
+        "ปลาหมึกยักษ์",
+        "ปลาหมึก",
+        "หมึก"
+      ]
     },
     {
       "word": "ฉลาม",
       "category": "สัตว์",
-      "en": "shark"
+      "en": "shark",
+      "aliases": [
+        "ปลาฉลาม"
+      ]
     },
     {
       "word": "วาฬ",
       "category": "สัตว์",
-      "en": "whale"
+      "en": "whale",
+      "aliases": [
+        "ปลาวาฬ"
+      ]
     },
     {
       "word": "โลมา",
       "category": "สัตว์",
-      "en": "dolphin"
+      "en": "dolphin",
+      "aliases": [
+        "ปลาโลมา"
+      ]
     },
     {
       "word": "เพนกวิน",
       "category": "สัตว์",
-      "en": "penguin"
+      "en": "penguin",
+      "aliases": [
+        "นกเพนกวิน",
+        "เพนกวิ้น",
+        "เพ็นกวิน"
+      ]
     },
     {
       "word": "นกฮูก",
       "category": "สัตว์",
-      "en": "owl"
+      "en": "owl",
+      "aliases": [
+        "นกเค้าแมว"
+      ]
     },
     {
       "word": "ยีราฟ",
@@ -450,7 +590,10 @@
     {
       "word": "แพนด้า",
       "category": "สัตว์",
-      "en": "panda"
+      "en": "panda",
+      "aliases": [
+        "หมีแพนด้า"
+      ]
     },
     {
       "word": "อูฐ",
@@ -460,7 +603,12 @@
     {
       "word": "จระเข้",
       "category": "สัตว์",
-      "en": "crocodile"
+      "en": "crocodile",
+      "aliases": [
+        "จรเข้",
+        "ตะเข้",
+        "alligator"
+      ]
     },
     {
       "word": "แกะ",
@@ -470,12 +618,21 @@
     {
       "word": "หัวกะโหลก",
       "category": "สิ่งของ",
-      "en": "skull"
+      "en": "skull",
+      "aliases": [
+        "กะโหลก",
+        "หัวกระโหลก",
+        "กระโหลก"
+      ]
     },
     {
       "word": "มงกุฎ",
       "category": "สิ่งของ",
-      "en": "crown"
+      "en": "crown",
+      "aliases": [
+        "มงกุฏ",
+        "มงกุท"
+      ]
     },
     {
       "word": "ดาบ",
@@ -485,12 +642,20 @@
     {
       "word": "กีตาร์",
       "category": "ดนตรี",
-      "en": "guitar"
+      "en": "guitar",
+      "aliases": [
+        "กีต้าร์",
+        "กีต้า"
+      ]
     },
     {
       "word": "ไมโครโฟน",
       "category": "ดนตรี",
-      "en": "microphone"
+      "en": "microphone",
+      "aliases": [
+        "ไมค์",
+        "mic"
+      ]
     },
     {
       "word": "หูฟัง",
@@ -500,7 +665,12 @@
     {
       "word": "เฮลิคอปเตอร์",
       "category": "ยานพาหนะ",
-      "en": "helicopter"
+      "en": "helicopter",
+      "aliases": [
+        "เฮลิคอปเต้อร์",
+        "เฮลิค็อปเตอร์",
+        "ฮอ"
+      ]
     },
     {
       "word": "รถไฟ",
@@ -510,17 +680,29 @@
     {
       "word": "รถบรรทุก",
       "category": "ยานพาหนะ",
-      "en": "truck"
+      "en": "truck",
+      "aliases": [
+        "รถสิบล้อ"
+      ]
     },
     {
       "word": "มอเตอร์ไซค์",
       "category": "ยานพาหนะ",
-      "en": "motorbike"
+      "en": "motorbike",
+      "aliases": [
+        "มอไซค์",
+        "มอเตอร์ไซด์",
+        "motorcycle"
+      ]
     },
     {
       "word": "บอลลูน",
       "category": "ยานพาหนะ",
-      "en": "hot air balloon"
+      "en": "hot air balloon",
+      "aliases": [
+        "บอลลูนลมร้อน",
+        "balloon"
+      ]
     },
     {
       "word": "ปราสาท",
@@ -530,22 +712,38 @@
     {
       "word": "ตึกระฟ้า",
       "category": "สถานที่",
-      "en": "skyscraper"
+      "en": "skyscraper",
+      "aliases": [
+        "ตึก",
+        "ตึกสูง"
+      ]
     },
     {
       "word": "หอไอเฟล",
       "category": "สถานที่",
-      "en": "The Eiffel Tower"
+      "en": "The Eiffel Tower",
+      "aliases": [
+        "eiffel tower",
+        "ไอเฟล"
+      ]
     },
     {
       "word": "ฟ้าแลบ",
       "category": "ธรรมชาติ",
-      "en": "lightning"
+      "en": "lightning",
+      "aliases": [
+        "ฟ้าผ่า",
+        "สายฟ้า"
+      ]
     },
     {
       "word": "เกล็ดหิมะ",
       "category": "ธรรมชาติ",
-      "en": "snowflake"
+      "en": "snowflake",
+      "aliases": [
+        "หิมะ",
+        "snow"
+      ]
     },
     {
       "word": "เห็ด",
@@ -555,12 +753,19 @@
     {
       "word": "กระบองเพชร",
       "category": "ธรรมชาติ",
-      "en": "cactus"
+      "en": "cactus",
+      "aliases": [
+        "แคคตัส"
+      ]
     },
     {
       "word": "ต้นมะพร้าว",
       "category": "ธรรมชาติ",
-      "en": "palm tree"
+      "en": "palm tree",
+      "aliases": [
+        "มะพร้าว",
+        "coconut tree"
+      ]
     },
     {
       "word": "องุ่น",
@@ -575,17 +780,30 @@
     {
       "word": "สตรอว์เบอร์รี",
       "category": "ผลไม้",
-      "en": "strawberry"
+      "en": "strawberry",
+      "aliases": [
+        "สตรอเบอร์รี่",
+        "สตรอเบอรี่",
+        "สตอเบอรี่",
+        "สตรอว์เบอร์รี่"
+      ]
     },
     {
       "word": "สับปะรด",
       "category": "ผลไม้",
-      "en": "pineapple"
+      "en": "pineapple",
+      "aliases": [
+        "สัปปะรด"
+      ]
     },
     {
       "word": "แครอท",
       "category": "อาหาร",
-      "en": "carrot"
+      "en": "carrot",
+      "aliases": [
+        "แครอต",
+        "แคร์รอต"
+      ]
     },
     {
       "word": "ขนมปัง",
@@ -595,32 +813,52 @@
     {
       "word": "แซนด์วิช",
       "category": "อาหาร",
-      "en": "sandwich"
+      "en": "sandwich",
+      "aliases": [
+        "แซนวิช",
+        "แซนวิส"
+      ]
     },
     {
       "word": "ฮอทดอก",
       "category": "อาหาร",
-      "en": "hot dog"
+      "en": "hot dog",
+      "aliases": [
+        "ฮอตดอก"
+      ]
     },
     {
       "word": "ลูกแพร์",
       "category": "ผลไม้",
-      "en": "pear"
+      "en": "pear",
+      "aliases": [
+        "แพร์"
+      ]
     },
     {
       "word": "โถส้วม",
       "category": "สิ่งของ",
-      "en": "toilet"
+      "en": "toilet",
+      "aliases": [
+        "ส้วม",
+        "ชักโครก"
+      ]
     },
     {
       "word": "อ่างอาบน้ำ",
       "category": "สิ่งของ",
-      "en": "bathtub"
+      "en": "bathtub",
+      "aliases": [
+        "อ่าง"
+      ]
     },
     {
       "word": "โซฟา",
       "category": "สิ่งของ",
-      "en": "couch"
+      "en": "couch",
+      "aliases": [
+        "sofa"
+      ]
     },
     {
       "word": "พัดลม",
@@ -630,7 +868,10 @@
     {
       "word": "ไฟฉาย",
       "category": "สิ่งของ",
-      "en": "flashlight"
+      "en": "flashlight",
+      "aliases": [
+        "torch"
+      ]
     },
     {
       "word": "บันได",
@@ -665,27 +906,44 @@
     {
       "word": "ถัง",
       "category": "สิ่งของ",
-      "en": "bucket"
+      "en": "bucket",
+      "aliases": [
+        "ถังน้ำ"
+      ]
     },
     {
       "word": "กระเป๋าเป้",
       "category": "สิ่งของ",
-      "en": "backpack"
+      "en": "backpack",
+      "aliases": [
+        "เป้"
+      ]
     },
     {
       "word": "กระเป๋าเดินทาง",
       "category": "สิ่งของ",
-      "en": "suitcase"
+      "en": "suitcase",
+      "aliases": [
+        "luggage"
+      ]
     },
     {
       "word": "แว่นตา",
       "category": "สิ่งของ",
-      "en": "eyeglasses"
+      "en": "eyeglasses",
+      "aliases": [
+        "แว่น",
+        "glasses"
+      ]
     },
     {
       "word": "เสื้อยืด",
       "category": "เสื้อผ้า",
-      "en": "t-shirt"
+      "en": "t-shirt",
+      "aliases": [
+        "เสื้อ",
+        "tshirt"
+      ]
     },
     {
       "word": "กางเกง",
@@ -700,7 +958,10 @@
     {
       "word": "ซองจดหมาย",
       "category": "สิ่งของ",
-      "en": "envelope"
+      "en": "envelope",
+      "aliases": [
+        "จดหมาย"
+      ]
     },
     {
       "word": "หกเหลี่ยม",
@@ -715,12 +976,18 @@
     {
       "word": "ป้ายหยุด",
       "category": "สิ่งของ",
-      "en": "stop sign"
+      "en": "stop sign",
+      "aliases": [
+        "stop"
+      ]
     },
     {
       "word": "ไฟจราจร",
       "category": "สิ่งของ",
-      "en": "traffic light"
+      "en": "traffic light",
+      "aliases": [
+        "ไฟแดง"
+      ]
     },
     {
       "word": "รั้ว",
@@ -730,12 +997,21 @@
     {
       "word": "บาสเกตบอล",
       "category": "กีฬา",
-      "en": "basketball"
+      "en": "basketball",
+      "aliases": [
+        "บาส",
+        "บาสเก็ตบอล"
+      ]
     },
     {
       "word": "ฟุตบอล",
       "category": "กีฬา",
-      "en": "soccer ball"
+      "en": "soccer ball",
+      "aliases": [
+        "football",
+        "soccer",
+        "บอล"
+      ]
     },
     {
       "word": "เบสบอล",
@@ -745,12 +1021,20 @@
     {
       "word": "ดัมเบล",
       "category": "กีฬา",
-      "en": "dumbbell"
+      "en": "dumbbell",
+      "aliases": [
+        "ดัมเบลล์",
+        "dumbell"
+      ]
     },
     {
       "word": "จานบิน",
       "category": "สิ่งของ",
-      "en": "flying saucer"
+      "en": "flying saucer",
+      "aliases": [
+        "ufo",
+        "ยูเอฟโอ"
+      ]
     }
   ],
   "hard": [
@@ -782,7 +1066,10 @@
     {
       "word": "ฟลามิงโก",
       "category": "สัตว์",
-      "en": "flamingo"
+      "en": "flamingo",
+      "aliases": [
+        "นกฟลามิงโก"
+      ]
     },
     {
       "word": "เม่น",
@@ -822,17 +1109,30 @@
     {
       "word": "กลอง",
       "category": "ดนตรี",
-      "en": "drums"
+      "en": "drums",
+      "aliases": [
+        "drum"
+      ]
     },
     {
       "word": "ทรัมเป็ต",
       "category": "ดนตรี",
-      "en": "trumpet"
+      "en": "trumpet",
+      "aliases": [
+        "ทรัมเป็ท",
+        "ทรัมเปต",
+        "ทรัมเป๊ต",
+        "แตร"
+      ]
     },
     {
       "word": "แทรกเตอร์",
       "category": "ยานพาหนะ",
-      "en": "tractor"
+      "en": "tractor",
+      "aliases": [
+        "รถไถ",
+        "แทรคเตอร์"
+      ]
     },
     {
       "word": "รถพยาบาล",
@@ -842,7 +1142,11 @@
     {
       "word": "รถดับเพลิง",
       "category": "ยานพาหนะ",
-      "en": "firetruck"
+      "en": "firetruck",
+      "aliases": [
+        "fire truck",
+        "fire engine"
+      ]
     },
     {
       "word": "เรือดำน้ำ",
@@ -867,12 +1171,22 @@
     {
       "word": "ทอร์นาโด",
       "category": "ธรรมชาติ",
-      "en": "tornado"
+      "en": "tornado",
+      "aliases": [
+        "ทอนาโด",
+        "พายุทอร์นาโด",
+        "ทอร์นาโด้",
+        "พายุหมุน"
+      ]
     },
     {
       "word": "กองไฟ",
       "category": "ธรรมชาติ",
-      "en": "campfire"
+      "en": "campfire",
+      "aliases": [
+        "แคมป์ไฟ",
+        "bonfire"
+      ]
     },
     {
       "word": "หัวหอม",
@@ -887,17 +1201,29 @@
     {
       "word": "บร็อกโคลี",
       "category": "อาหาร",
-      "en": "broccoli"
+      "en": "broccoli",
+      "aliases": [
+        "บรอกโคลี",
+        "บร็อคโคลี่",
+        "บรอคโคลี่"
+      ]
     },
     {
       "word": "สเต็ก",
       "category": "อาหาร",
-      "en": "steak"
+      "en": "steak",
+      "aliases": [
+        "สเต๊ก",
+        "สเต็ค"
+      ]
     },
     {
       "word": "ถั่วลิสง",
       "category": "อาหาร",
-      "en": "peanut"
+      "en": "peanut",
+      "aliases": [
+        "ถั่ว"
+      ]
     },
     {
       "word": "สร้อยคอ",
@@ -912,7 +1238,10 @@
     {
       "word": "ปฏิทิน",
       "category": "สิ่งของ",
-      "en": "calendar"
+      "en": "calendar",
+      "aliases": [
+        "ปฎิทิน"
+      ]
     },
     {
       "word": "เครื่องคิดเลข",
@@ -937,7 +1266,10 @@
     {
       "word": "ตู้จดหมาย",
       "category": "สิ่งของ",
-      "en": "mailbox"
+      "en": "mailbox",
+      "aliases": [
+        "ตู้ไปรษณีย์"
+      ]
     },
     {
       "word": "ร่มชูชีพ",
@@ -947,7 +1279,10 @@
     {
       "word": "เรือแคนู",
       "category": "ยานพาหนะ",
-      "en": "canoe"
+      "en": "canoe",
+      "aliases": [
+        "แคนู"
+      ]
     },
     {
       "word": "เรือเร็ว",
@@ -962,17 +1297,26 @@
     {
       "word": "ไม้เทนนิส",
       "category": "กีฬา",
-      "en": "tennis racquet"
+      "en": "tennis racquet",
+      "aliases": [
+        "เทนนิส"
+      ]
     },
     {
       "word": "สเก็ตบอร์ด",
       "category": "กีฬา",
-      "en": "skateboard"
+      "en": "skateboard",
+      "aliases": [
+        "สเก็ตบอด"
+      ]
     },
     {
       "word": "นางฟ้า",
       "category": "สิ่งมีชีวิต",
-      "en": "angel"
+      "en": "angel",
+      "aliases": [
+        "เทวดา"
+      ]
     }
   ]
 }

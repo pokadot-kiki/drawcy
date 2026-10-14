@@ -9,6 +9,7 @@ const path = require("path");
 const { Server } = require("socket.io");
 const { cleanName, cleanAvatar, isNameAllowed } = require("./clean");
 const { hashOwnerKey, normalizeOwnerName } = require("./name-ownership");
+const answers = require("./answers");
 const { TEAM_IDS, computeBalancedTeams } = require("./teams"); // จัดทีมให้สมดุล (ฟังก์ชันล้วน แยกไฟล์ให้ทดสอบตรง ๆ)
 const leaderboard = require("./leaderboard");
 const ai = require("./ai");
@@ -398,7 +399,7 @@ function handleTeamGuess(socket, room, player, text) {
     for (const id of [lane.drawerId, ...lane.guessedIds]) io.to(id).emit("chat_message", msg);
     return;
   }
-  if (normalize(text) !== normalize(room.word)) return void io.to(lane.code).emit("chat_message", msg); // ทายผิด เห็นแค่ในทีม
+  if (!answers.isCorrect(text, room.word)) return void io.to(lane.code).emit("chat_message", msg); // ทายผิด เห็นแค่ในทีม
 
   lane.guessedIds.add(socket.data.pid);
   if (!lane.solved) {
@@ -452,6 +453,7 @@ function loadWords() {
       if (!word || seen.has(word)) continue;
       seen.add(word);
       WORD_BANK[level].push({ word, category: typeof item?.category === "string" ? item.category : "" });
+      answers.register(word, item?.aliases); // คำที่นับว่าถูก (เก็บที่ server เท่านั้น ไม่ส่งออก)
     }
   }
 
@@ -672,10 +674,6 @@ function challengeAllowsFill(room, color) {
 //   shapes_only → อนุญาต (เป็นเครื่องมือเดียวที่ใช้ได้ในโหมดนี้) · ตกผ่าน challengeAllowsFill เป็น true
 function challengeAllowsShape(room, color) {
   return challengeAllowsFill(room, color);
-}
-
-function normalize(text) {
-  return String(text ?? "").toLowerCase().replace(/\s+/g, "");
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -1422,7 +1420,7 @@ function handleSoloGuess(socket, data) {
   const now = Date.now();
   if (now - solo.lastGuessAt < GUESS_MIN_GAP_MS) return;
   solo.lastGuessAt = now;
-  if (normalize(text) === normalize(solo.guessWord)) return endDrawRound(solo, true);
+  if (answers.isCorrect(text, solo.guessWord)) return endDrawRound(solo, true);
   solo.replies.push(text);
   emitSolo(solo, "ai_draw_reply", { text, correct: false });
 }
@@ -1792,7 +1790,7 @@ io.on("connection", (socket) => {
     }
 
     // ทายถูก
-    if (normalize(text) === normalize(room.word)) {
+    if (answers.isCorrect(text, room.word)) { // คำหลัก หรือคำที่นับว่าถูก (aliases · อังกฤษ · สะกดคล้าย)
       room.guessedIds.add(socket.data.pid);
       const gained = 50 + room.timeLeft * 5;
       player.score += gained;
