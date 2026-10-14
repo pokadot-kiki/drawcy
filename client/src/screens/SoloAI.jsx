@@ -295,7 +295,7 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
     setLives(3);
     setFinal(null);
     setPhase("starting");
-    socket.emit("ai_start", { name: initialName, difficulty: boot.difficulty, nameOwnerKey: nameOwnerKey() });
+    socket.emit("ai_start", { name: initialName, difficulty: boot.difficulty, avatar, nameOwnerKey: nameOwnerKey() });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -382,7 +382,7 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
     setLives(3);
     setFinal(null);
     setPhase("starting");
-    socket.emit("ai_start", { name, difficulty, nameOwnerKey: nameOwnerKey() });
+    socket.emit("ai_start", { name, difficulty, avatar, nameOwnerKey: nameOwnerKey() });
   }
 
   // ช่วง 2: ส่งคำที่พิมพ์ให้ server ตัดสิน (ฝั่งนี้ไม่รู้คำตอบเลย)

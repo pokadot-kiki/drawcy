@@ -1,6 +1,7 @@
 // ตารางอันดับ ใช้ทั้งหน้าแรก (compact, 10 อันดับ) และหน้า Leaderboard (20 อันดับ)
 // รับ { status, top, retry } จาก useLeaderboard แล้วจัดการทั้งสามสถานะ: โหลด · error · ว่าง
 import YouTag from "./YouTag";
+import Avatar from "./Avatar";
 import { Icon } from "./Icons";
 
 const MEDALS = { 1: "medal1", 2: "medal2", 3: "medal3" };
@@ -68,8 +69,11 @@ export default function RankTable({
                 ชื่อแบบ <b>x</b> จะขึ้นเป็นตัวอักษรตามนั้น ไม่ถูกตีความเป็น HTML
                 (ห้ามเปลี่ยนไปใช้ dangerouslySetInnerHTML ที่นี่เด็ดขาด) */}
             <td className="rank-row__name">
-              {row.name}
-              {meName && row.name === meName && <YouTag />}
+              <span className="rank-row__who">
+                <Avatar index={row.avatar ?? 0} />
+                <span className="rank-row__text">{row.name}</span>
+                {meName && row.name === meName && <YouTag />}
+              </span>
             </td>
             {showLevel && <td className="rank-row__level">{row.levelReached}</td>}
             <td className="rank-row__score">{row.score}</td>

@@ -570,7 +570,7 @@ key อยู่ฝั่ง server เท่านั้น ไม่เคย�
 
 ### `ai_start` C → S
 ```js
-{ name: "mh", difficulty: "hard", nameOwnerKey: "32 ตัวอักษร hex" }   // difficulty ไม่ส่งก็ได้
+{ name: "mh", difficulty: "hard", avatar: 3, nameOwnerKey: "32 ตัวอักษร hex" }   // difficulty avatar ไม่ส่งก็ได้ (avatar 0–11 ค่าอื่น = 0 · ใช้บันทึกลงกระดานตอนจบเกม)
 ```
 ชื่อผ่าน `cleanName` ว่างตอบ `game_error` `INVALID_NAME` · ชื่อที่มีเจ้าของแต่กุญแจไม่ตรงตอบ `NAME_OWNED` ก่อนเริ่มเกม
 `difficulty` (`"easy"` `"medium"` `"hard"`) = ใช้ **ชุดคำระดับนั้นทั้งเกม** (ทั้งช่วง 1 และภาพของช่วง 2) · เวลายังสั้นลงตามด่านตามตารางข้างบน
@@ -677,9 +677,10 @@ server เรียก `saveScore` เองตอนจบ client ส่งค�
 | `score` | 1320 |
 | `levelReached` | 6 |
 | `playedAt` | 2026-10-05 20:14 |
+| `avatar` | 3 (อวตารตอนเล่นเกมนั้น 0–11 · แถวเก่าที่ไม่มีช่องนี้ถือเป็น 0) |
 
 `playedAt` เป็นเวลาท้องถิ่นของ server รูปแบบ `YYYY-MM-DD HH:mm` server ใส่เองตอนบันทึก ไม่รับจาก client · record อาจมี `ownerHash` ภายในไฟล์/Upstash เพื่อยืนยันเจ้าของ แต่ field นี้ **ห้ามออกจาก server**
-คนบันทึกคะแนนคือ `saveScore({ name, score, levelReached })` ใน `server/leaderboard.js` (Solo เรียกตอนจบเกม)
+คนบันทึกคะแนนคือ `saveScore({ name, score, levelReached, avatar })` ใน `server/leaderboard.js` (Solo เรียกตอนจบเกม)
 ชื่อผ่าน `cleanName` เหมือนระบบห้อง · ชื่อว่างไม่บันทึก · คะแนนและด่านเป็นจำนวนเต็มไม่ติดลบ
 
 ### ขอดูอันดับ `GET /api/leaderboard?board=multi&month=2026-10`
@@ -695,8 +696,8 @@ server เรียก `saveScore` เองตอนจบ client ส่งค�
   month: "2026-10",
   board: "solo",
   top: [
-    { rank: 1, name: "Tar", score: 1880, levelReached: 8 },
-    { rank: 2, name: "mh", score: 1320, levelReached: 6 }
+    { rank: 1, name: "Tar", score: 1880, levelReached: 8, avatar: 3 },
+    { rank: 2, name: "mh", score: 1320, levelReached: 6, avatar: 0 }   // avatar ของเกมที่ดีที่สุดของชื่อนั้น · แถวเก่า = 0
   ]
 }
 ```
@@ -863,3 +864,4 @@ server เรียก `saveScore` เองตอนจบ client ส่งค�
 | 14 ต.ค. | mh | **ล็อกชื่อเก่าที่ไม่มีเจ้าของ** — ชื่อที่มีในกระดานแต่ไม่มี `ownerHash` ตอบ `NAME_OWNED` ทุกคน ทุกทาง (create/join/Solo/บันทึกคะแนน) · เดิม "ใครก็ใช้ได้ คนแรกที่บันทึกเป็นเจ้าของ" (ผู้ใช้เลือกล็อก) |
 | 14 ต.ค. | mh | **Solo รีเฟรชแล้วต่อเกมเดิมได้** — สถานะ Solo ผูกกับ `playerId` แทน socket · หลุดแล้ว server พักเกม 30 วิ (ตัวจับเวลาเดินต่อ) · event ใหม่ `ai_resume` (C→S มี callback) ตอบสถานะปัจจุบัน (ด่าน ชีวิต คะแนน คำของเรา/หมวดภาพ เวลาที่เหลือ ช่วง คำเดา เส้นช่วง 2 ที่วาดไปแล้ว) ไม่มีคำตอบช่วง 2 · หลุดเกินเวลา/กดออก = ไม่บันทึกคะแนนเหมือนเดิม |
 | 14 ต.ค. | mh | `NAME_TAKEN` เทียบชื่อแบบเดียวกับเจ้าของชื่อ (NFKC · ไม่สนตัวพิมพ์ · ลบอักขระล่องหน · ยุบช่องว่าง) เดิมเทียบตรงทุกตัวอักษร "Tar" กับ "tar" อยู่ห้องเดียวกันได้ · รูปร่างข้อมูลไม่เปลี่ยน |
+| 14 ต.ค. | mh | **อวตารใน Leaderboard** — แถวคะแนนเก็บ `avatar` (0–11) · `GET /api/leaderboard` ส่ง `avatar` ในแต่ละแถวของ `top` (แถวเก่าที่ไม่มี = 0) · `ai_start` รับ `avatar` (ไม่บังคับ) · จบเกมห้องบันทึก `avatar` ของผู้เล่น · ไม่เกี่ยวกับเจ้าของชื่อ (`ownerHash` ไม่เปลี่ยน) |

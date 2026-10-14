@@ -1,11 +1,13 @@
 import Modal from "./Modal";
 import Mascot from "./Mascot";
 import YouTag from "./YouTag";
+import Avatar from "./Avatar";
 
 // สรุปจบตา — เฉลยคำ + คะแนนที่แต่ละคนได้ในตานี้
 // results จาก server มีแค่ { playerId, gained } ต้องไปหาชื่อจากรายชื่อผู้เล่นเอง
 export default function RoundSummaryModal({ summary, players, myTeam = null, meId = null }) {
   const nameOf = (id) => players.find((p) => p.id === id)?.name ?? "?";
+  const avatarOf = (id) => players.find((p) => p.id === id)?.avatar ?? 0; // ไม่อยู่ในห้องแล้ว = อวตารตัวแรก
   const gains = summary.results ?? [];
 
   return (
@@ -41,7 +43,8 @@ export default function RoundSummaryModal({ summary, players, myTeam = null, meI
         <ul className="gains">
           {gains.map((g) => (
             <li className={g.playerId === meId ? "gains__row gains__row--me" : "gains__row"} key={g.playerId}>
-              <span>
+              <span className="gains__who">
+                <Avatar index={avatarOf(g.playerId)} />
                 {nameOf(g.playerId)}
                 {g.playerId === meId && <YouTag />}
               </span>

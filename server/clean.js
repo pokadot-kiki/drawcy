@@ -28,4 +28,10 @@ function isNameAllowed(name) {
   return !OFFENSIVE_NAMES.some((word) => normalized.includes(word));
 }
 
-module.exports = { cleanName, isNameAllowed, normalizeNameForCheck, OFFENSIVE_NAMES, SAFE_OVERLAPS };
+// เลขอวตารต้องเป็นจำนวนเต็ม 0–11 (อวตาร 12 แบบ) ค่าอื่นใช้ 0 — ใช้ทั้งในห้อง (index.js) และตอนบันทึกคะแนน (leaderboard.js)
+function cleanAvatar(value) {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 0 && n <= 11 ? n : 0;
+}
+
+module.exports = { cleanName, cleanAvatar, isNameAllowed, normalizeNameForCheck, OFFENSIVE_NAMES, SAFE_OVERLAPS };

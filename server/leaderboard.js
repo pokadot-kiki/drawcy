@@ -11,7 +11,7 @@
 //      ใช้ fetch ของ Node ล้วน ไม่เพิ่ม library · token อยู่ใน env เท่านั้น ไม่เคยอยู่ใน event/log
 const fs = require("fs");
 const path = require("path");
-const { cleanName } = require("./clean");
+const { cleanName, cleanAvatar } = require("./clean");
 const { hashOwnerKey, normalizeOwnerName, ownerOfName, canUseName } = require("./name-ownership");
 
 // เทสตั้ง SCORES_FILE ชี้ไปไฟล์ชั่วคราว จะได้ไม่ไปทับคะแนนจริง
@@ -183,7 +183,7 @@ function cleanCount(value) {
 // เวลาเล่น (playedAt) server ใส่เอง ไม่รับจากข้างนอก
 // คืนแถวที่บันทึก หรือ null ถ้าชื่อว่าง/บันทึกไม่สำเร็จ (ไม่ throw ให้เกมล่ม)
 // board: "multi" = คะแนนจากเกมห้อง (index.js เรียกตอน endGame) · ไม่ใส่ = solo
-function saveScore({ name, score, levelReached, board, nameOwnerKey } = {}, playedAt = new Date()) {
+function saveScore({ name, score, levelReached, board, avatar, nameOwnerKey } = {}, playedAt = new Date()) {
   const cleanedName = cleanName(name);
   if (!cleanedName) return null;
   try {
@@ -199,6 +199,7 @@ function saveScore({ name, score, levelReached, board, nameOwnerKey } = {}, play
       score: cleanCount(score),
       levelReached: cleanCount(levelReached),
       playedAt: formatPlayedAt(playedAt),
+      avatar: cleanAvatar(avatar), // อวตารตอนเล่นเกมนี้ (โชว์ในหน้า Leaderboard) · ไม่เกี่ยวกับเจ้าของชื่อ
     };
     if (existingOwner || suppliedOwner) row.ownerHash = existingOwner || suppliedOwner;
     if (board === "multi") row.board = "multi"; // solo ไม่ใส่ช่องนี้ แถวจึงหน้าตาเหมือนเดิมทุกตัวอักษร
@@ -244,10 +245,10 @@ function getLeaderboard(month = null, board = "solo") {
   return {
     month,
     board,
-    // ส่งเฉพาะ 4 ช่องที่หน้าจอใช้ ไม่ส่ง id กับเวลาเล่น
+    // ส่งเฉพาะช่องที่หน้าจอใช้ ไม่ส่ง id กับเวลาเล่น (และไม่มี ownerHash) · แถวเก่าที่ไม่มีอวตาร = 0
     top: bestPerName(month, board)
       .slice(0, TOP_LIMIT)
-      .map((r, i) => ({ rank: i + 1, name: r.name, score: r.score, levelReached: r.levelReached })),
+      .map((r, i) => ({ rank: i + 1, name: r.name, score: r.score, levelReached: r.levelReached, avatar: cleanAvatar(r.avatar) })),
   };
 }
 

@@ -4865,3 +4865,32 @@ select[class] {
     min-height: 66px;
   }
 }
+
+/* อวตารหน้าชื่อ: สรุปตา · จบเกม · ตาราง Leaderboard (bug-sweep ข้อ 2) */
+.gains__who {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rank-row__who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* ชื่อยาวยังตัดเป็น ... เหมือนเดิม (ตัด "ตัวชื่อ" ไม่ใช่ทั้งช่องที่มีอวตารอยู่ด้วย) */
+.rank-row__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ในตารางย่อขนาดอวตารลงจาก 42px ไม่ให้แถวสูงเกินไป (รูปข้างใน 30px ยังพอดี) */
+.rank-row__who .avatar-chip {
+  width: 36px;
+  height: 36px;
+}
+

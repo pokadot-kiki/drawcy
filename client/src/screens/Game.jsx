@@ -357,6 +357,7 @@ export default function Game({
       {game.ranking && (
         <GameOverModal
           ranking={game.ranking}
+          players={players}
           teamRanking={teamMode ? game.teamRanking : null}
           winner={game.winner}
           myTeam={myTeam}

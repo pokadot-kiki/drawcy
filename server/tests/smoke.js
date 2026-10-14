@@ -1308,8 +1308,8 @@ async function main() {
     r = await getBoard();
     check("ตลอดกาล → 200 และ month เป็น null", [r.status, r.body?.month], [200, null]);
     check("ตลอดกาล ส่งแค่ 20 อันดับ", r.body.top.length, 20);
-    check("แต่ละแถวมีแค่ rank name score levelReached",
-      r.body.top.every((t) => JSON.stringify(Object.keys(t)) === '["rank","name","score","levelReached"]'), true);
+    check("แต่ละแถวมีแค่ rank name score levelReached avatar (เพิ่ม avatar ใน bug-sweep)",
+      r.body.top.every((t) => JSON.stringify(Object.keys(t)) === '["rank","name","score","levelReached","avatar"]'), true);
     check("rank เรียง 1..20", r.body.top.map((t) => t.rank), Array.from({ length: 20 }, (_, i) => i + 1));
     checkOk("คะแนนเรียงจากมากไปน้อย", r.body.top.every((t, i, a) => i === 0 || a[i - 1].score >= t.score));
     check("อันดับ 1 คือคะแนนสูงสุด", r.body.top[0].name, "Tar");
@@ -3421,6 +3421,48 @@ async function main() {
     const r2 = await emitAck(ok2.socket, "join_room", { code: made.code, name: "Tarn", avatar: 1 });
     checkOk("ชื่อที่ต่างจริง (Tarn) ยังเข้าได้", r2?.ok);
     for (const r of [host, ok2]) r.socket.disconnect();
+  });
+
+  await runPart("40.4 อวตารใน Leaderboard: เก็บพร้อมคะแนน · ส่งใน API · แถวเก่า = 0 · เจ้าของชื่อไม่เสีย", async () => {
+    const lb = require("../leaderboard");
+    const keyA = "7".repeat(32), keyB = "8".repeat(32);
+    lb.saveScore({ name: "Avatar404", score: 444, levelReached: 3, avatar: 7, nameOwnerKey: keyA });
+    lb.saveScore({ name: "AvatarBad404", score: 443, levelReached: 3, avatar: 99, nameOwnerKey: keyA });
+    lb.writeScores([...lb.loadScores(), { id: 99404, name: "AvatarOld404", score: 442, levelReached: 3, playedAt: "2026-01-05 10:00" }]);
+    const top = lb.getLeaderboard(null, "solo").top;
+    check("saveScore เก็บอวตาร · API ส่ง avatar", top.find((r) => r.name === "Avatar404")?.avatar, 7);
+    check("อวตารนอกช่วง (99) → 0", top.find((r) => r.name === "AvatarBad404")?.avatar, 0);
+    check("แถวเก่าไม่มีอวตาร → 0 ไม่พัง", top.find((r) => r.name === "AvatarOld404")?.avatar, 0);
+    check("แถวใน API มีแค่ rank name score levelReached avatar (ไม่มี ownerHash)", Object.keys(top.find((r) => r.name === "Avatar404")).sort(), ["avatar", "levelReached", "name", "rank", "score"]);
+    check("เจ้าของชื่อยังทำงาน: กุญแจอื่นใช้ชื่อไม่ได้ · เจ้าของใช้ได้", [lb.canUseName(lb.loadScores(), "Avatar404", keyB), lb.canUseName(lb.loadScores(), "Avatar404", keyA)], [false, true]);
+    const api = await (await fetch(`${URL}/api/leaderboard?board=solo`)).json();
+    check("GET /api/leaderboard ส่ง avatar", api.top.find((r) => r.name === "Avatar404")?.avatar, 7);
+    // จบเกมห้อง → บันทึกอวตารของผู้เล่น
+    const H = track(await connect()), G = track(await connect());
+    const made = await emitAck(H.socket, "create_room", { name: "AvHost404", avatar: 5, rounds: 1, drawTime: 30, nameOwnerKey: "5".repeat(32) });
+    await emitAck(G.socket, "join_room", { code: made.code, name: "AvGuest404", avatar: 9, nameOwnerKey: "6".repeat(32) });
+    H.socket.emit("start_game");
+    for (let t = 0; t < 2; t++) {
+      const d = await Promise.race([H.wait("choose_word", (x) => !x.__u, 6000).then(() => H), G.wait("choose_word", (x) => !x.__u, 6000).then(() => G)]);
+      const cw = d.dump().filter((e) => e.name === "choose_word").at(-1).args[0]; cw.__u = true;
+      d.clear(); d.socket.emit("word_chosen", { word: cw.options[0] });
+      await new Promise((r) => setTimeout(r, 400));
+      (d === H ? G : H).socket.emit("guess", { text: cw.options[0] });
+      await new Promise((r) => setTimeout(r, 3800));
+    }
+    await H.wait("game_end", null, 8000);
+    const multi = lb.getLeaderboard(null, "multi").top;
+    check("จบเกมห้อง: บันทึกอวตารของแต่ละคน", [multi.find((r) => r.name === "AvHost404")?.avatar, multi.find((r) => r.name === "AvGuest404")?.avatar], [5, 9]);
+    H.socket.disconnect(); G.socket.disconnect();
+    // Solo: ai_start ส่งอวตาร → บันทึกตอนจบเกม
+    const S = track(await connect());
+    S.socket.emit("ai_start", { name: "AvSolo404", avatar: 11, nameOwnerKey: "4".repeat(32) });
+    await S.wait("ai_round_start", null, 3000);
+    // ไม่ส่งภาพ → หมดเวลาด่านละ 2 วิ (AI_TIME_OVERRIDE ของ server หลัก) เสียครบ 3 ชีวิตแล้วจบเกม
+    await S.wait("ai_game_end", null, 20000).catch(() => null);
+    const solo = lb.getLeaderboard(null, "solo").top.find((r) => r.name === "AvSolo404");
+    check("Solo: บันทึกอวตารจาก ai_start", solo?.avatar ?? "ยังไม่จบเกม", 11);
+    S.socket.disconnect();
   });
 
   await runPart("41. ตรวจชื่อไม่สุภาพทุกทาง และยุบตัวอักษรหลบเลี่ยง", async () => {

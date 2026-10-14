@@ -7,7 +7,7 @@ const os = require("os");
 const crypto = require("crypto");
 const path = require("path");
 const { Server } = require("socket.io");
-const { cleanName, isNameAllowed } = require("./clean");
+const { cleanName, cleanAvatar, isNameAllowed } = require("./clean");
 const { hashOwnerKey, normalizeOwnerName } = require("./name-ownership");
 const { TEAM_IDS, computeBalancedTeams } = require("./teams"); // จัดทีมให้สมดุล (ฟังก์ชันล้วน แยกไฟล์ให้ทดสอบตรง ๆ)
 const leaderboard = require("./leaderboard");
@@ -184,11 +184,6 @@ function makeRoomCode() {
 }
 
 // เลขอวตารต้องเป็นจำนวนเต็ม 0-11 ตาม events.md ค่าอื่นที่ไม่ถูกต้องใช้ 0 แทน (ไม่ต้องแจ้ง error)
-function cleanAvatar(value) {
-  const n = Number(value);
-  return Number.isInteger(n) && n >= 0 && n <= 11 ? n : 0;
-}
-
 function roomState(room) {
   const state = {
     code: room.code,
@@ -1067,7 +1062,7 @@ function endGame(room) {
   // บันทึกคะแนนของทุกคนลงกระดาน "เล่นกับเพื่อน" — server บันทึกเอง client ส่งคะแนนมาไม่ได้
   // คนที่ได้ 0 ไม่บันทึก (ไม่ได้เล่นจริง) · saveScore ไม่ throw จึงไม่ทำให้จบเกมพัง
   for (const p of room.players) {
-    if (p.score > 0) leaderboard.saveScore({ name: p.name, score: p.score, levelReached: 0, board: "multi", nameOwnerKey: room.nameOwnerKeys?.get(p.id) });
+    if (p.score > 0) leaderboard.saveScore({ name: p.name, score: p.score, levelReached: 0, board: "multi", avatar: p.avatar, nameOwnerKey: room.nameOwnerKeys?.get(p.id) });
   }
   io.to(room.code).emit("game_end", ended);
   io.to(room.code).emit("room_update", roomState(room));
@@ -1443,7 +1438,7 @@ function endSoloGame(solo) {
   clearTimeout(solo.roundTimer);
   clearTimeout(solo.nextTimer);
   clearStrokeTimers(solo);
-  leaderboard.saveScore({ ...result, nameOwnerKey: solo.nameOwnerKey });
+  leaderboard.saveScore({ ...result, avatar: solo.avatar, nameOwnerKey: solo.nameOwnerKey });
   solo.final = { totalScore: result.score, levelReached: result.levelReached, rank: leaderboard.rankOf(result) };
   emitSolo(solo, "ai_game_end", solo.final);
   clearTimeout(solo.dropTimer);
@@ -1968,7 +1963,7 @@ io.on("connection", (socket) => {
     stopSolo(socket);  // กดเริ่มซ้ำ = เริ่มเกมใหม่ เกมเก่าทิ้ง (รวมเกมที่ค้างอยู่ใต้ playerId เดียวกัน)
     const solo = {
       pid: socket.data.pid,
-      name, nameOwnerKey: data?.nameOwnerKey, difficulty: LEVELS.includes(data?.difficulty) ? data.difficulty : null, level: 1, lives: SOLO_LIVES, totalScore: 0, usedWords: new Set(), roundId: 0,
+      name, avatar: cleanAvatar(data?.avatar), nameOwnerKey: data?.nameOwnerKey, difficulty: LEVELS.includes(data?.difficulty) ? data.difficulty : null, level: 1, lives: SOLO_LIVES, totalScore: 0, usedWords: new Set(), roundId: 0,
       over: false, drawing: false, busy: false, roundTimer: null, nextTimer: null, dropTimer: null,
       guessing: false, resting: false, drawNext: false, passed: false, strokeTimers: [],
     };
