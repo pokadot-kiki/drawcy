@@ -51,7 +51,7 @@
     visibility: "private", // "private" (เข้าด้วยรหัสเท่านั้น) | "public" (ขึ้นในรายการห้องหน้าแรก)
     maxPlayers: 8,         // จำนวนผู้เล่นสูงสุดของห้อง 2–8
     teams: 2,              // จำนวนทีมในโหมดทีม: 2 | 3 | 4 (ทีม A–D) · classic ไม่ใช้
-    challenges: ["none", "colour_fix", "dont_lift_pen"] // Mini Challenge ที่เปิด (ดูหัวข้อ 5) เปิดอย่างน้อย 1 ใบเสมอ
+    challenges: ["none", "colour_fix", "dont_lift_pen", "shapes_only"] // Mini Challenge ที่เปิด (ดูหัวข้อ 5) ห้องใหม่เปิดครบ 4 ใบ · เปิดอย่างน้อย 1 ใบเสมอ
   }
 }
 
@@ -473,6 +473,7 @@ server สุ่ม challenge **ตอนขึ้นตา (ก่อนเล�
 
 **เปิด/ปิดทีละใบ** `settings.challenges` คือลิสต์ชนิดที่เปิด (subset ของ `["none","colour_fix","dont_lift_pen","shapes_only"]`)
 - `"none"` = Standard Drawing (วาดอิสระ) · ต้องเปิดอย่างน้อย 1 ใบเสมอ
+- **ห้องใหม่เปิดครบ 4 ใบ** (`["none","colour_fix","dont_lift_pen","shapes_only"]`) หัวห้องปิดทีละใบเองได้ · ห้องที่มีอยู่แล้วไม่ถูกเปลี่ยน
 - **แต่ละตา server สุ่มจากใบที่เปิดเท่านั้น** — เปิดแค่ `["none"]` = ไม่มี Mini Challenge เลย · ปิด `none` = ทุกตาเป็นกติกาพิเศษ
 
 ### `set_challenges` C → S (หัวห้องเท่านั้น, ในห้องรอ)
@@ -880,3 +881,4 @@ server เรียก `saveScore` เองตอนจบ client ส่งค�
 | 14 ต.ค. | mh | **คำที่นับว่าถูก (aliases)** — `words.json`/`ai-words.json` มีช่อง `aliases` (ไม่บังคับ) · ทุกโหมดตัดสินด้วย `server/answers.js` (NFKC · ไม่สนตัวพิมพ์ · ลบอักขระล่องหน/ช่องว่าง/ขีด/การันต์ · วรรณยุกต์ผิดผ่อนเฉพาะคำยาวที่ไม่ชนคำอื่น) · Solo รับชื่ออังกฤษ `en` · AI ทายช่วง 1 ใช้กติกาเดียวกัน · aliases ไม่ส่งออก |
 | 14 ต.ค. | mh | event ใหม่ `close_guess` `{}` S → คนที่ทายคนเดียว: ทายผิดแต่ห่าง 1–2 ตัวอักษร · ไม่มีคำตอบ · ไม่ broadcast · จำกัด 3 ครั้ง/15 วิ · ห้อง ทีม และ Solo ช่วง 2 |
 | 14 ต.ค. | mh | **Leaderboard เฉพาะเดือนนี้ (เวลาไทย)** — `GET /api/leaderboard` ไม่รับ `month` แล้ว (ส่งมาไม่มีผล · ไม่มี `INVALID_MONTH`) คำตอบ `month` = เดือนปัจจุบัน Asia/Bangkok เสมอ ไม่มี `null`/ตลอดกาล/ย้อนหลัง · `playedAt` ใหม่เป็นเวลาไทย · `ai_game_end.rank` = อันดับเดือนนี้ของกระดาน solo · ข้อมูลเก่าเก็บไว้ไม่ลบ |
+| 14 ต.ค. | mh | **Mini Challenge ค่าเริ่มต้นเปิดครบ 4/4** — ห้องใหม่ `settings.challenges` = `["none","colour_fix","dont_lift_pen","shapes_only"]` (เดิมไม่มี `shapes_only`) · `challenge: true` แบบเก่า = ชุดนี้ด้วย · ห้องที่มีอยู่แล้วไม่เปลี่ยน · รูปร่างข้อมูลเหมือนเดิม |

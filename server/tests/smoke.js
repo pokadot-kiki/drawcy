@@ -1032,7 +1032,7 @@ async function main() {
   // สุ่ม colour_fix ให้ได้มากพอจะจับได้ถ้า "สีขาว" หลุดกลับเข้ากอง (ข้อ 16.1)
   // colour_fix ออกราว 30% ⇒ ต้องสร้างราว 3-4 ห้องต่อ 1 ตาสี
   const COLOUR_FIX_WANTED = 25;
-  const COLOUR_FIX_MAX_ROOMS = 150;
+  const COLOUR_FIX_MAX_ROOMS = 260; // ค่าเริ่มต้นเปิด 4 ใบ colour_fix ออกราว 1/5 ห้อง (เดิม 1/3) จึงต้องเผื่อห้องมากขึ้น
   const seenTypes = [];
   const seenChallengeColors = []; // ทุกสีที่ colour_fix ล็อกไว้ (เฉพาะสี ไม่ซ้ำคำ)
   const roomOfType = {};
@@ -1069,13 +1069,11 @@ async function main() {
     }
 
     checkOk(`สร้างห้องจริงได้ครบ ${CHALLENGE_TRIES} ตัวอย่าง`, seenTypes.length === CHALLENGE_TRIES);
-    checkOk("ทุกค่าที่ออกมาเป็นหนึ่งในสามชนิดที่กำหนด",
-      seenTypes.every((t) => ["none", "colour_fix", "dont_lift_pen"].includes(t)));
-    checkOk("ไม่มี shapes_only ออกมา (ปิดไว้โดยค่าเริ่มต้น หัวห้องต้องเปิดการ์ดเองในห้องรอ — ดูข้อ 34)",
-      seenTypes.every((t) => t !== "shapes_only"));
-    // ถ้าเขียนโค้ดให้ออกแต่ none อย่างเดียว หรือให้ชนิดใดชนิดหนึ่งไม่ออกเลย ข้อนี้จะจับได้
-    checkOk(`ทั้งสามชนิดออกจริงใน ${CHALLENGE_TRIES} ห้อง`,
-      new Set(seenTypes).size === 3);
+    checkOk("ทุกค่าที่ออกมาเป็นหนึ่งในสี่ชนิดที่กำหนด",
+      seenTypes.every((t) => ["none", "colour_fix", "dont_lift_pen", "shapes_only"].includes(t)));
+    // ห้องใหม่เปิดครบ 4 ใบโดยค่าเริ่มต้น (14 ต.ค.) — ถ้าเขียนโค้ดให้ออกแต่ none หรือชนิดใดไม่ออกเลย ข้อนี้จะจับได้
+    checkOk(`ทั้งสี่ชนิดออกจริงใน ${CHALLENGE_TRIES} ห้อง (ค่าเริ่มต้นเปิดครบ 4/4)`,
+      new Set(seenTypes).size === 4);
     // ตรวจความถี่แบบหลวม ๆ (ไม่ใช่การทดสอบสัดส่วนจริง ๆ เพราะต้องสุ่มหลายร้อยห้องจึงจะแยก 40/30/30
     // ออกจาก 35/35/30 ได้ ซึ่งจะทำให้เทสล้มมั่วเป็นครั้งคราว) — จับได้เฉพาะกรณีสุดโต่ง
     // เช่น none ออก 0 ครั้ง หรือออกเกือบทุกห้อง ซึ่งแปลว่าเขียนสัดส่วนผิดชัด ๆ
@@ -1969,6 +1967,10 @@ async function main() {
     check("กลับมาสมดุล 2 ต่อ 2", [teamOf(H, H.socket.id), teamOf(H, P2.socket.id), teamOf(H, P3.socket.id), teamOf(H, P4.socket.id)], ["A", "B", "A", "B"]);
 
     // ---------- เริ่มเกม: คำเดียวกัน คนวาดคนละทีม ----------
+    // ข้อนี้ทดสอบกำแพงกั้นทีมด้วยเส้นมือเปล่า — ห้องใหม่เปิด Mini Challenge ครบ 4 ใบ (14 ต.ค.)
+    // ถ้าสุ่มได้ shapes_only เส้นมือเปล่าจะถูกทิ้งหมด จึงตั้งเฉพาะ 3 ใบที่วาดมือเปล่าได้ (เรื่อง 4/4 ทดสอบในข้อ 16 และ 46)
+    H.socket.emit("set_challenges", { challenges: ["none", "colour_fix", "dont_lift_pen"] });
+    await H.wait("room_update", (r) => r.settings.challenges.length === 3, 2000).catch(() => null);
     clearAll(H, P2, P3, P4);
     H.socket.emit("start_game");
     const ch = await H.wait("choose_word");
@@ -2105,10 +2107,16 @@ async function main() {
     check("ตาที่ 2: ทีม A ถูกข้าม (drawerIds.A = null) ทีม B ยังมีคนวาด", [rs2A.drawerIds.A, rs2A.drawerIds.B], [null, P4.socket.id]);
     const e0 = { H: H.dump().length, P2: P2.dump().length };
     const c2nd = rs2A.challenge.type === "colour_fix" ? rs2A.challenge.color : "#000000";
-    draw(H, c2nd); // ทีม A ไม่มีคนวาด → วาดไม่ได้
-    draw(P4, c2nd);
+    // ห้องใหม่เปิด Mini Challenge ครบ 4 ใบ (14 ต.ค.) ตานี้อาจเป็น shapes_only = วาดมือเปล่าไม่ได้ ใช้รูปทรงแทน
+    const shapes2 = rs2A.challenge.type === "shapes_only";
+    const ev2 = shapes2 ? "draw_shape" : "stroke_start";
+    const draw2 = (P) => shapes2
+      ? P.socket.emit("draw_shape", { shape: "line", x1: 0.2, y1: 0.2, x2: 0.6, y2: 0.6, color: c2nd, size: 5 })
+      : draw(P, c2nd);
+    draw2(H); // ทีม A ไม่มีคนวาด → วาดไม่ได้
+    draw2(P4);
     await wait(300);
-    check("ทีมที่ถูกข้ามวาดไม่ได้ · ทีม B วาดได้ถึงเพื่อนในทีม", [count(P2, "stroke_start", e0.P2), count(H, "stroke_start", e0.H)], [1, 0]);
+    check("ทีมที่ถูกข้ามวาดไม่ได้ · ทีม B วาดได้ถึงเพื่อนในทีม", [count(P2, ev2, e0.P2), count(H, ev2, e0.H)], [1, 0]);
     P2.socket.emit("guess", { text: word2 });
     const end2 = await H.wait("round_end", (e) => e.word === word2, 3000);
     check("ทีม B ถูกครบ + ทีม A ถูกข้าม → จบตา firstTeam = B", end2.firstTeam, "B");
@@ -2151,7 +2159,7 @@ async function main() {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const last = (P, name) => P.dump().filter((e) => e.name === name).at(-1)?.args[0];
     // ค่าเริ่มต้นของตัวเลือกห้องที่เพิ่มทีหลัง (ข้อ 32 เทสตัวเลือกพวกนี้โดยตรง)
-    const NEW_DEFAULTS = { difficulty: "easy", visibility: "private", maxPlayers: 8, teams: 2, challenges: ["none", "colour_fix", "dont_lift_pen"] };
+    const NEW_DEFAULTS = { difficulty: "easy", visibility: "private", maxPlayers: 8, teams: 2, challenges: ["none", "colour_fix", "dont_lift_pen", "shapes_only"] };
     const socks = [];
     const make = async (data) => {
       const P = track(await connect()); socks.push(P);
@@ -2229,9 +2237,16 @@ async function main() {
           checkOk(`intro_end มาหลังเริ่มตาราว 2 วิ (ได้ ${waited} ms)`, waited >= 1700 && waited <= 3200);
           const tm = await guesser.wait("timer", null, 3000);
           check("เวลาวาดเท่าเดิม: tick แรกหลังป้ายหายเหลือ 29 จาก 30", tm.timeLeft, 29);
-          drawer.socket.emit("stroke_start", { x: 0.2, y: 0.2, color: out.rs.challenge.type === "colour_fix" ? out.rs.challenge.color : "#000000", size: 5, tool: "pen" });
-          checkOk("หลังป้ายหาย: คนวาดวาดได้ ส่งถึงคนทาย", (await guesser.tryWait("stroke_start", null, 2000)) !== null);
-          drawer.socket.emit("stroke_end");
+          // ตา shapes_only (ห้องใหม่เปิดครบ 4 ใบ) วาดมือเปล่าไม่ได้ → ใช้รูปทรงแทน
+          const col = out.rs.challenge.type === "colour_fix" ? out.rs.challenge.color : "#000000";
+          if (out.rs.challenge.type === "shapes_only") {
+            drawer.socket.emit("draw_shape", { shape: "line", x1: 0.2, y1: 0.2, x2: 0.5, y2: 0.5, color: col, size: 5 });
+            checkOk("หลังป้ายหาย: คนวาดวาดได้ ส่งถึงคนทาย", (await guesser.tryWait("draw_shape", null, 2000)) !== null);
+          } else {
+            drawer.socket.emit("stroke_start", { x: 0.2, y: 0.2, color: col, size: 5, tool: "pen" });
+            checkOk("หลังป้ายหาย: คนวาดวาดได้ ส่งถึงคนทาย", (await guesser.tryWait("stroke_start", null, 2000)) !== null);
+            drawer.socket.emit("stroke_end");
+          }
         }
         if (!checkIntro && rs.intro) await guesser.wait("intro_end", null, 4000); // ตาที่มีป้ายใหญ่ ต้องรอป้ายหายก่อนทายถึงจะนับ
         guesser.socket.emit("guess", { text: word });
@@ -2300,10 +2315,13 @@ async function main() {
       check("ทีม ช่วงป้ายใหญ่: ทั้งสองเลนวาดไม่ติด", (await T1.quiet("stroke_start", 300)).length + (await T2.quiet("stroke_start", 1)).length, 0);
       await T1.wait("intro_end", null, 3000);
       checkOk("ทีม intro_end ถึงทุกคน", (await T2.tryWait("intro_end", null, 1000)) !== null && (await T4.tryWait("intro_end", null, 1000)) !== null);
-      T4.socket.emit("stroke_start", { x: 0.2, y: 0.2, color: col, size: 5, tool: "pen" });
-      checkOk("ทีม หลังป้ายหาย: เลน B วาดได้ ถึงเพื่อนในทีม B", (await T2.tryWait("stroke_start", null, 2000)) !== null);
-      check("ทีม หลังป้ายหาย: ภาพเลน B ไม่รั่วไปทีม A", (await T1.quiet("stroke_start", 300)).length, 0);
-      T4.socket.emit("stroke_end");
+      // ตา shapes_only (ห้องใหม่เปิดครบ 4 ใบ) วาดมือเปล่าไม่ได้ → ใช้รูปทรงแทน
+      const ev2 = c2a.challenge.type === "shapes_only" ? "draw_shape" : "stroke_start";
+      if (ev2 === "draw_shape") T4.socket.emit("draw_shape", { shape: "line", x1: 0.2, y1: 0.2, x2: 0.5, y2: 0.5, color: col, size: 5 });
+      else T4.socket.emit("stroke_start", { x: 0.2, y: 0.2, color: col, size: 5, tool: "pen" });
+      checkOk("ทีม หลังป้ายหาย: เลน B วาดได้ ถึงเพื่อนในทีม B", (await T2.tryWait(ev2, null, 2000)) !== null);
+      check("ทีม หลังป้ายหาย: ภาพเลน B ไม่รั่วไปทีม A", (await T1.quiet(ev2, 300)).length, 0);
+      if (ev2 === "stroke_start") T4.socket.emit("stroke_end");
       const w2 = (await T3.wait("your_word", null, 3000)).word;
       T1.socket.emit("guess", { text: w2 }); T2.socket.emit("guess", { text: w2 });
       await T1.wait("game_end", null, 9000);
@@ -2818,20 +2836,20 @@ async function main() {
     const G = track(await connect());
     await emitAck(G.socket, "join_room", { code: made.code, name: "ChalG", avatar: 1 });
     await wait(150);
-    check("ค่าเริ่มต้น challenges = Standard + colour_fix + dont_lift_pen", last(H, "room_update").settings.challenges, ["none", "colour_fix", "dont_lift_pen"]);
+    check("ค่าเริ่มต้น challenges = เปิดครบ 4/4", last(H, "room_update").settings.challenges, ["none", "colour_fix", "dont_lift_pen", "shapes_only"]);
 
     // คนที่ไม่ใช่หัวห้องเปลี่ยนไม่ได้
     G.clear();
     G.socket.emit("set_challenges", { challenges: ["none"] });
     const err = await G.wait("game_error", null, 1500);
-    check("คนที่ไม่ใช่หัวห้องกดแล้วได้ NOT_HOST และค่าไม่เปลี่ยน", [err?.code, last(H, "room_update").settings.challenges], ["NOT_HOST", ["none", "colour_fix", "dont_lift_pen"]]);
+    check("คนที่ไม่ใช่หัวห้องกดแล้วได้ NOT_HOST และค่าไม่เปลี่ยน", [err?.code, last(H, "room_update").settings.challenges], ["NOT_HOST", ["none", "colour_fix", "dont_lift_pen", "shapes_only"]]);
 
     // ค่าเพี้ยน/ว่างถูกเมิน (ต้องเหลืออย่างน้อย 1 ใบ)
     H.socket.emit("set_challenges", { challenges: [] });
     H.socket.emit("set_challenges", { challenges: ["banana"] });
     H.socket.emit("set_challenges", { challenges: "x" });
     await wait(150);
-    check("ลิสต์ว่าง/ค่าเพี้ยนถูกเมิน (คงค่าเดิม)", last(H, "room_update").settings.challenges, ["none", "colour_fix", "dont_lift_pen"]);
+    check("ลิสต์ว่าง/ค่าเพี้ยนถูกเมิน (คงค่าเดิม)", last(H, "room_update").settings.challenges, ["none", "colour_fix", "dont_lift_pen", "shapes_only"]);
 
     // หัวห้องเปิดการ์ด shapes_only กลับมา (เปิดใบเดียว)
     H.clear();
@@ -3452,6 +3470,44 @@ async function main() {
     for (const r of [host, ok2]) r.socket.disconnect();
   });
 
+  await runPart("46. Mini Challenge ค่าเริ่มต้นเปิดครบ 4/4 (ห้องใหม่เท่านั้น) · ยังต้องเหลืออย่างน้อย 1 ใบ", async () => {
+    const ALL4 = ["none", "colour_fix", "dont_lift_pen", "shapes_only"];
+    const last = (P, name) => P.dump().filter((e) => e.name === name).at(-1)?.args[0];
+    const A = track(await connect());
+    const a = await emitAck(A.socket, "create_room", { name: "Def46A", avatar: 0 });
+    await new Promise((r) => setTimeout(r, 150));
+    check("ห้องใหม่แข่งเดี่ยว: challenges = 4/4", last(A, "room_update")?.settings.challenges, ALL4);
+    const T = track(await connect());
+    await emitAck(T.socket, "create_room", { name: "Def46T", avatar: 0, mode: "team", teams: 3 });
+    await new Promise((r) => setTimeout(r, 150));
+    check("ห้องใหม่โหมดทีม: challenges = 4/4", last(T, "room_update")?.settings.challenges, ALL4);
+    const L = track(await connect());
+    await emitAck(L.socket, "create_room", { name: "Def46L", avatar: 0, challenge: true });
+    await new Promise((r) => setTimeout(r, 150));
+    check("ค่าแบบเก่า challenge: true = ชุดเริ่มต้นใหม่ 4/4", last(L, "room_update")?.settings.challenges, ALL4);
+    // ห้องเดิมที่หัวห้องตั้งไว้แล้ว ไม่ถูกเปลี่ยนตามค่าเริ่มต้น
+    A.socket.emit("set_challenges", { challenges: ["none", "dont_lift_pen"] });
+    await A.wait("room_update", (r) => r.settings.challenges.length === 2, 2000).catch(() => null);
+    const B = track(await connect());
+    await emitAck(B.socket, "create_room", { name: "Def46B", avatar: 0 });
+    await new Promise((r) => setTimeout(r, 150));
+    check("ห้องที่ตั้งไว้แล้วคงชุดเดิม (ไม่ถูกทับด้วย 4/4)", last(A, "room_update")?.settings.challenges, ["none", "dont_lift_pen"]);
+    // ปิดทีละใบจาก 4/4 ได้จนเหลือ 1 ใบ แต่ปิดหมดไม่ได้
+    T.socket.emit("set_challenges", { challenges: ["shapes_only"] });
+    await T.wait("room_update", (r) => r.settings.challenges.length === 1, 2000).catch(() => null);
+    T.socket.emit("set_challenges", { challenges: [] });
+    await new Promise((r) => setTimeout(r, 200));
+    check("จาก 4/4 ปิดเหลือ 1 ใบได้ · ปิดหมดไม่ได้ (คงใบสุดท้าย)", last(T, "room_update")?.settings.challenges, ["shapes_only"]);
+    T.socket.emit("set_challenges", { challenges: [...ALL4, "banana", "none"] });
+    await T.wait("room_update", (r) => r.settings.challenges.length === 4, 2000).catch(() => null);
+    check("เปิดกลับครบ 4/4 ได้ (ค่าแปลก/ซ้ำถูกกรอง)", last(T, "room_update")?.settings.challenges, ALL4);
+    // Solo ไม่มี Mini Challenge — เริ่มได้ปกติ ai_round_start ไม่มีช่อง challenge
+    const S = track(await connect());
+    S.socket.emit("ai_start", { name: "Def46S", avatar: 0 });
+    const rs = await S.wait("ai_round_start", null, 4000).catch(() => null);
+    checkOk("Solo เริ่มได้ปกติ ไม่ได้รับ challenge", !!rs && rs.challenge === undefined);
+    for (const P of [A, T, L, B, S]) P.socket.disconnect();
+  });
 
   await runPart("47. เคอร์เซอร์ไม่หาย (กัน Windows) — สแกน CSS/JS ฝั่ง client", async () => {
     // กติกา: ห้าม cursor: none (เคอร์เซอร์หายทั้งจอถ้า JS วาดแทนไม่ทัน) · cursor: url(...) ต้องลงท้ายด้วยคีย์เวิร์ดสำรองเสมอ

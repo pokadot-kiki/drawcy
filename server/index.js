@@ -570,8 +570,9 @@ const COLOUR_FIX_COLORS = CHALLENGE_COLORS.filter((c) => c !== BOARD_COLOR);
 // ชนิดกติกาทั้งหมดที่เลือกเปิด/ปิดได้ · "none" = Standard Drawing (วาดอิสระ)
 const CHALLENGE_TYPES = ["none", "colour_fix", "dont_lift_pen", "shapes_only"];
 const SPECIAL_CHALLENGES = ["colour_fix", "dont_lift_pen", "shapes_only"]; // ทุกใบยกเว้น Standard
-// ค่าเริ่มต้นตอนสร้างห้อง: เปิด Standard + colour_fix + dont_lift_pen (shapes_only ปิดไว้ก่อน หัวห้องเปิดเองได้)
-const DEFAULT_CHALLENGES = ["none", "colour_fix", "dont_lift_pen"];
+// ค่าเริ่มต้นตอนสร้างห้อง: เปิดครบ 4/4 (หัวห้องปิดทีละใบเองได้ในห้องรอ) · ⚠️ ต้องตรงกับ client/src/roomOptions.js
+// ใช้ตอนสร้างห้องใหม่เท่านั้น — ห้องที่มีอยู่แล้วเก็บชุดของตัวเองใน settings.challenges ไม่ถูกเปลี่ยน
+const DEFAULT_CHALLENGES = [...CHALLENGE_TYPES];
 
 // กรองลิสต์ให้เหลือชนิดที่รู้จัก ไม่ซ้ำ และต้องมีอย่างน้อย 1 ใบ (ไม่งั้นคืน null = ไม่รับค่านี้)
 function sanitizeChallenges(list) {

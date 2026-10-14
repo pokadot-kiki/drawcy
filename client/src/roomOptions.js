@@ -23,8 +23,8 @@ export const CHALLENGE_CARDS = [
   { id: "shapes_only", title: "Geometric Shapes Only", desc: "ใช้ได้แต่เครื่องมือรูปทรง (เส้น สี่เหลี่ยม วงกลม)" },
 ];
 
-// ค่าเริ่มต้นเมื่อ server ยังไม่ได้ส่ง challenges มา (กันพังตอน render)
-export const DEFAULT_CHALLENGES = ["none", "colour_fix", "dont_lift_pen"];
+// ค่าเริ่มต้นเมื่อ server ยังไม่ได้ส่ง challenges มา (กันพังตอน render) · เปิดครบ 4/4 ตรงกับ DEFAULT_CHALLENGES ของ server
+export const DEFAULT_CHALLENGES = CHALLENGE_CARDS.map((c) => c.id);
 
 export const difficultyLabel = (d) => DIFFICULTY_CHOICES.find(([v]) => v === d)?.[1] ?? "ง่าย";
 
