@@ -12,7 +12,7 @@ import { useEnterRoom } from "../hooks/useEnterRoom";
 
 // หน้าแรก (หน้าเดียว ไม่รก)
 // ซ้าย: ริบบิ้น PLAY · อวตารใหญ่ + ลูกศร · ชื่อ · ปุ่มใหญ่ 3 ปุ่ม (สร้างห้อง / เข้าห้อง / Solo)
-// ขวา: Top 10 (เดือนนี้/ตลอดกาล)
+// ขวา: Leaderboard เดือนนี้ (เวลาไทย)
 // ชื่อกับอวตารอยู่ที่ App (profile) เพื่อให้ติดไปหน้า SET UP ได้ ฝั่งนี้แค่ช่วยให้ใช้ง่าย server ตรวจซ้ำเสมอ
 export default function Lobby({
   connected,

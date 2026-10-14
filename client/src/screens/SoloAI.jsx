@@ -851,7 +851,7 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
           <p className="solo-result solo-result--ok">
             {final.rank ? (
               <>
-                <Icon name="trophy" size={22} /> อันดับ {final.rank} ของตลอดกาล
+                <Icon name="trophy" size={22} /> อันดับ {final.rank} ของเดือนนี้
               </>
             ) : (
               "บันทึกคะแนนไม่สำเร็จ"

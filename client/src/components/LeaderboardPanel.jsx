@@ -1,12 +1,12 @@
 import { useState } from "react";
 import RankTable from "./RankTable";
-import { monthKey, useLeaderboard } from "../hooks/useLeaderboard";
+import { thaiMonthName, useLeaderboard } from "../hooks/useLeaderboard";
 import { Icon } from "./Icons";
 
 // เนื้อในของ Leaderboard — ใช้ร่วมกันทั้งการ์ดในหน้าแรกและหน้า /leaderboard เต็ม (ไม่เขียนซ้ำ)
-// ประกอบด้วย: หัว (ชื่อ + dropdown เลือกเดือน) · แท็บ เล่นกับเพื่อน/แข่งกับ AI · ตารางอันดับ
+// ประกอบด้วย: หัว (ชื่อ + ชื่อเดือนนี้) · แท็บ เล่นกับเพื่อน/แข่งกับ AI · ตารางอันดับ
+// แสดงเฉพาะเดือนนี้ (เวลาไทย) — ไม่มีตลอดกาล/ย้อนหลัง · ชื่อเดือนมาจาก server ขึ้นเดือนใหม่ตารางเริ่มว่างเอง
 // หน้าแรกส่ง scroll เพื่อให้ตารางเลื่อนภายในการ์ด (ไม่ดันการ์ดสูงจนล้น)
-const ALL_TIME = "";
 
 // สองกระดานแยกกัน (server เก็บแยกด้วยช่อง board) — แท็บแค่เปลี่ยนว่าขอกระดานไหนจาก API
 const BOARDS = [
@@ -14,25 +14,13 @@ const BOARDS = [
   { id: "solo", label: "แข่งกับ AI", icon: "robot", note: "คะแนนจากโหมด Solo แข่งกับ AI" },
 ];
 
-// "2026-10" → "ตุลาคม 2569" (ปี พ.ศ. ตามที่คนไทยคุ้น)
-function monthLabel(key) {
-  const [y, m] = key.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString("th-TH", { month: "long", year: "numeric" });
-}
-
-function recentMonths(count = 12) {
-  const now = new Date();
-  return Array.from({ length: count }, (_, i) => monthKey(new Date(now.getFullYear(), now.getMonth() - i, 1)));
-}
-
 export default function LeaderboardPanel({ limit = 20, scroll = false, meName = "" }) {
-  const [months] = useState(recentMonths);
-  const [month, setMonth] = useState(months[0]); // เปิดมาเห็นเดือนนี้ก่อน
   const [tab, setTab] = useState("multi");
-  // เปิดหน้า เปลี่ยนแท็บ หรือเปลี่ยนเดือน = ขอ API ใหม่ทุกครั้ง (ไม่เก็บคะแนนไว้ในเครื่อง)
-  const board = useLeaderboard(month, tab);
+  // เปิดหน้าหรือเปลี่ยนแท็บ = ขอ API ใหม่ทุกครั้ง (ไม่เก็บคะแนนไว้ในเครื่อง)
+  const board = useLeaderboard(tab);
   const info = BOARDS.find((b) => b.id === tab);
-  const periodText = month === ALL_TIME ? "ตลอดกาล" : `เดือน${monthLabel(month)}`;
+  const monthName = thaiMonthName(board.month);
+  const periodText = monthName ? `เดือน${monthName}` : "เดือนนี้";
 
   const table = (
     <RankTable
@@ -52,24 +40,8 @@ export default function LeaderboardPanel({ limit = 20, scroll = false, meName = 
         <h2 className="panel__title board-panel__title">
           <Icon name="trophy" size={28} /> Leaderboard
         </h2>
-        <div className="board-panel__picker">
-          <label className="field__label board-panel__label" htmlFor="lb-month">
-            MONTH
-          </label>
-          <select
-            id="lb-month"
-            className="input board-panel__select"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-          >
-            {months.map((key) => (
-              <option key={key} value={key}>
-                {monthLabel(key)}
-              </option>
-            ))}
-            <option value={ALL_TIME}>ตลอดกาล</option>
-          </select>
-        </div>
+        {/* ชื่อเดือนอย่างเดียว ไม่มีปี ไม่มีตัวเลือก (ยังไม่โหลดก็ไม่โชว์) */}
+        {monthName && <span className="board-panel__month">{monthName}</span>}
       </div>
 
       <div className="board-tabs" role="tablist" aria-label="กระดานคะแนน">

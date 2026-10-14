@@ -1569,24 +1569,12 @@ input {
   margin-right: auto;
 }
 
-/* ป้าย MONTH กับตัวเลือกอยู่ติดกันเสมอ ตกบรรทัดก็ไปด้วยกัน */
-.board-panel__picker {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.board-panel__label {
-  margin: 0;
-}
-
-.board-panel__select {
-  width: auto;
-  min-width: 190px;
-  min-height: 44px;
-  margin: 0;
-  font-family: var(--font-body);
-  cursor: pointer;
+/* ชื่อเดือนนี้ข้างหัว Leaderboard (แสดงอย่างเดียว ไม่ใช่ตัวเลือก) */
+.board-panel__month {
+  font-family: var(--font-head);
+  font-size: 20px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .board-panel__back {
