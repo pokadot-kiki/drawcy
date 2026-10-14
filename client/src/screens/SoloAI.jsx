@@ -38,6 +38,23 @@ const MODE_TEXT = {
 const MAX_GUESS_CHARS = 40; // ตรงกับเพดานที่ server รับ
 const NEXT_DELAY_S = 4; // server พัก 4 วิก่อนด่านถัดไป (ใช้แสดงนับถอยหลังเฉยๆ)
 
+// ── รีเฟรชแล้วกลับเข้าเกมเดิม (ai_resume) ──
+// ACTIVE_KEY = แท็บนี้มีเกม Solo ค้างอยู่ → เปิดหน้า /solo แล้วขอ server ต่อเกมเดิมแทนการโชว์หน้ากรอกชื่อ
+// CANVAS_KEY = ภาพช่วง 1 ที่เราวาดเอง (server ไม่ได้เก็บภาพของเรา) ผูกกับ "ด่าน|คำ" ของเกมเดิม
+// sessionStorage = ของแท็บนี้เท่านั้น (ตรงกับ playerKey ที่ก็อยู่ใน sessionStorage) · ใช้ไม่ได้ก็แค่ไม่กลับมา ไม่ทำให้เกมพัง
+const ACTIVE_KEY = "jdi.soloActive";
+const CANVAS_KEY = "jdi.soloCanvas";
+function storeGet(key) {
+  try { return sessionStorage.getItem(key); } catch { return null; }
+}
+function storeSet(key, value) {
+  try { sessionStorage.setItem(key, value); } catch { /* เต็ม/ปิดอยู่: ภาพแค่ไม่กลับมาตอนรีเฟรช */ }
+}
+function storeDel(key) {
+  try { sessionStorage.removeItem(key); } catch { /* ไม่เป็นไร */ }
+}
+const roundKeyOf = (r) => (r ? `${r.level}|${r.word}` : "");
+
 // การกระทำที่ "ย้อนได้ทีละหนึ่งอัน" — หนึ่งเส้น (start..end) หนึ่งครั้งเทสี หนึ่งครั้งล้างจอ
 const OP_START = new Set(["stroke_start", "fill", "draw_shape", "clear_canvas"]);
 function lastOpIndex(actions) {
@@ -64,7 +81,9 @@ const DIFFICULTIES = [
 export default function SoloAI({ initialName = "", avatar = 0, boot = null, onName, onBack }) {
   // intro = กรอกชื่อ · starting = ส่ง ai_start แล้วรอด่านแรก · playing = ช่วง 1 เราวาด AI ทาย
   // watch = ช่วง 2 ดูภาพที่เล่นซ้ำแล้วพิมพ์ทาย · rest = พักระหว่างช่วง · over = จบเกม
-  const [phase, setPhase] = useState("intro");
+  // resuming = เปิดหน้ามาแล้วแท็บนี้มีเกมค้าง กำลังขอ server ต่อเกมเดิม (มาจาก SET UP = เกมใหม่ ไม่ต่อของเก่า)
+  const [phase, setPhase] = useState(() => (!boot && storeGet(ACTIVE_KEY) ? "resuming" : "intro"));
+  const [resumeNote, setResumeNote] = useState("");
   const [name, setName] = useState(initialName);
   const [nameWarning, setNameWarning] = useState("");
   // ระดับความยากของ "ชุดคำ" ทั้งเกม (เวลายังสั้นลงตามด่านเหมือนเดิม) — server เป็นคนสุ่มคำตามระดับนี้
@@ -161,6 +180,7 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
   // ── ผูก event ของ Solo ครั้งเดียวตอนเปิดหน้า ──
   useEffect(() => {
     const onRoundStart = (d) => {
+      storeSet(ACTIVE_KEY, "1");
       roundRef.current = d;
       watchRef.current = null;
       setRound(d);
@@ -219,6 +239,8 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
       if (d.correct) play("selfCorrect");
     };
     const onGameEnd = (d) => {
+      storeDel(ACTIVE_KEY);
+      storeDel(CANVAS_KEY);
       setThink(false);
       setScore(d.totalScore);
       setFinal(d);
@@ -253,7 +275,7 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
       socket.off("game_error", onError);
       clearTimeout(thinkTimer.current);
       // ออกจากหน้ากลางเกม = เลิกเล่น (server ไม่บันทึกคะแนน)
-      if (phaseRef.current === "starting" || phaseRef.current === "playing" || phaseRef.current === "watch" || phaseRef.current === "rest") {
+      if (["starting", "playing", "watch", "rest", "resuming"].includes(phaseRef.current)) {
         socket.emit("leave_room");
       }
     };
@@ -277,6 +299,32 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // รีเฟรชกลางเกม → ขอ server ต่อเกมเดิม (รอให้ socket ต่อติดก่อน) · ไม่มีเกมแล้ว = กลับหน้ากรอกชื่อพร้อมบอกเหตุผล
+  useEffect(() => {
+    if (phaseRef.current !== "resuming") return undefined;
+    let done = false;
+    const ask = () =>
+      socket.timeout(6000).emit("ai_resume", {}, (err, res) => {
+        if (done) return;
+        done = true;
+        if (err || !res?.ok || !res.state) {
+          storeDel(ACTIVE_KEY);
+          storeDel(CANVAS_KEY);
+          setResumeNote("เกมเดิมจบไปแล้ว (หลุดนานเกินไป) เริ่มเกมใหม่ได้เลย");
+          setPhase("intro");
+          return;
+        }
+        applyResume(res.state);
+      });
+    if (socket.connected) ask();
+    else socket.once("connect", ask);
+    return () => {
+      done = true;
+      socket.off("connect", ask);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ขึ้นด่านใหม่ = ล้างกระดานและประวัติย้อนกลับ
   useEffect(() => {
     if (roundId === 0) return;
@@ -290,7 +338,7 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
   const stage = phase === "watch" ? watch : round; // ช่วงที่กำลังเล่นอยู่ (ใช้ดูเวลาเต็ม)
   useEffect(() => {
     if (!live || !stage) return undefined;
-    const deadline = Date.now() + stage.time * 1000;
+    const deadline = Date.now() + (stage.left ?? stage.time) * 1000; // left = เวลาที่เหลือตอนกลับเข้าเกม (ai_resume)
     const id = setInterval(() => {
       setTimeLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
     }, 250);
@@ -345,6 +393,8 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
   }
 
   function handleLeave() {
+    storeDel(ACTIVE_KEY);
+    storeDel(CANVAS_KEY);
     // ปิดเกมที่ server ด้วย (จบเกมแล้วไม่มีอะไรค้าง ส่งไปก็ไม่เป็นไร)
     socket.emit("leave_room");
     phaseRef.current = "over"; // กัน cleanup ส่งซ้ำ
@@ -356,7 +406,85 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
     const b = canvasRef.current;
     setHist({ undo: !!b && lastOpIndex(b.getActions()) >= 0, redo: redoRef.current.length > 0 });
   }
+  // เก็บภาพช่วง 1 ลง sessionStorage (รายการ action ชุดเดียวกับที่ Canvas ใช้วาดซ้ำ) ผูกกับด่าน|คำ ของเกมเดิม
+  function saveDrawing() {
+    const b = canvasRef.current;
+    if (!b || phaseRef.current !== "playing") return;
+    storeSet(CANVAS_KEY, JSON.stringify({ key: roundKeyOf(roundRef.current), actions: b.getActions() }));
+  }
+  // วาดภาพช่วง 1 ที่เก็บไว้กลับมา — อ่านไม่ได้/คนละด่าน = กระดานว่าง (เกมไม่พัง)
+  function restoreDrawing(r) {
+    const b = canvasRef.current;
+    if (!b) return;
+    b.resetBoard();
+    try {
+      const saved = JSON.parse(storeGet(CANVAS_KEY) || "null");
+      if (saved?.key === roundKeyOf(r) && Array.isArray(saved.actions)) b.applyHistory(saved.actions);
+    } catch {
+      b.resetBoard();
+    }
+    redoRef.current = [];
+    syncHist();
+  }
+  // ภาพของช่วง 2 ที่ AI วาดไปแล้ว (server ส่งมาพร้อม ai_resume) วาดทั้งเส้นทันที ไม่ต้องไล่จุดใหม่
+  function drawStrokesNow(strokes) {
+    const b = canvasRef.current;
+    if (!b) return;
+    for (const st of strokes || []) {
+      if (!Array.isArray(st?.points) || st.points.length === 0) continue;
+      b.applyRemote(beginStroke({ x: st.points[0].x, y: st.points[0].y, color: st.color, size: st.size, tool: TOOLS.PEN }));
+      if (st.points.length > 1) b.applyRemote(extendStroke(st.points.slice(1)));
+      b.applyRemote(endStroke());
+    }
+  }
+  // นำสถานะจาก ai_resume มาแสดง — ทุกค่ามาจาก server (ด่าน ชีวิต คะแนน เวลาที่เหลือ) ยกเว้นภาพช่วง 1 ที่เก็บในเครื่อง
+  function applyResume(st) {
+    setScore(st.totalScore ?? 0);
+    setLives(st.lives ?? 3);
+    if (st.phase === "over") {
+      storeDel(ACTIVE_KEY);
+      storeDel(CANVAS_KEY);
+      setFinal(st.final);
+      setPhase("over");
+      return;
+    }
+    if (st.round) {
+      roundRef.current = st.round;
+      setRound(st.phase === "draw" ? { ...st.round, left: st.timeLeft } : st.round);
+    }
+    clearStrokes();
+    if (st.phase === "draw") {
+      watchRef.current = null;
+      setGuesses((st.guesses || []).map((g) => ({ text: String(g.guess ?? ""), correct: Boolean(g.correct) })));
+      setTimeLeft(st.timeLeft);
+      restoreDrawing(st.round);
+      setPhase("playing");
+    } else if (st.phase === "watch") {
+      watchRef.current = st.watch;
+      setWatch({ ...st.watch, left: st.timeLeft });
+      setWrongAnswers((st.replies || []).map(String));
+      setTimeLeft(st.timeLeft);
+      canvasRef.current?.resetBoard();
+      drawStrokesNow(st.strokes);
+      setPhase("watch");
+    } else {
+      watchRef.current = null;
+      setResult(st.result);
+      setRestLeft(st.restLeft ?? NEXT_DELAY_S);
+      if (st.result?.kind === "guess") {
+        setWrongAnswers((st.replies || []).map(String));
+        canvasRef.current?.resetBoard();
+        drawStrokesNow(st.strokes);
+      } else {
+        setGuesses((st.guesses || []).map((g) => ({ text: String(g.guess ?? ""), correct: Boolean(g.correct) })));
+        restoreDrawing(st.round);
+      }
+      setPhase("rest");
+    }
+  }
+
   function handleAction(action) {
+    if (["stroke_end", "fill", "draw_shape", "clear_canvas"].includes(action.type)) saveDrawing();
     if (!OP_START.has(action.type)) return;
     redoRef.current = []; // วาดใหม่หลังย้อน = ทิ้งกองทำซ้ำ (เหมือนโหมดห้อง)
     syncHist();
@@ -370,6 +498,7 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
     redoRef.current.push(all.slice(i));
     b.applyHistory(all.slice(0, i));
     syncHist();
+    saveDrawing();
   }
   function redo() {
     const b = canvasRef.current;
@@ -377,6 +506,7 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
     if (!b || !op) return;
     b.applyHistory([...b.getActions(), ...op]);
     syncHist();
+    saveDrawing();
   }
 
   const canDraw = phase === "playing" && (timeLeft ?? 1) > 0;
@@ -405,6 +535,7 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
           <h2 className="panel__title">
             <Icon name="robot" size={28} /> Solo แข่งกับ AI
           </h2>
+          {resumeNote && <p className="form-note" role="status">{resumeNote}</p>}
           <p className="solo-intro__text">
             คุณวาดตามคำที่ได้ AI ดูภาพแล้วทาย · ทายถูกขึ้นด่านถัดไป ยิ่งผ่านมากยิ่งยาก
             ทายไม่ออกในเวลาเสีย 1 ชีวิต (มี 3 ชีวิต)
@@ -565,7 +696,7 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
                   {round.word}
                 </span>
               ) : (
-                <span className="topbar__idle">กำลังเริ่มเกม...</span>
+                <span className="topbar__idle">{phase === "resuming" ? "กำลังกลับเข้าเกมเดิม..." : "กำลังเริ่มเกม..."}</span>
               )}
             </div>
             <div className="wordbar__side wordbar__side--end" />
