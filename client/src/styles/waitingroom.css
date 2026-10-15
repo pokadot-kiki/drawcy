@@ -801,7 +801,7 @@
   padding: 6px 16px;
 }
 
-@media (min-width: 1001px) and (min-height: 600px) {
+@media (min-width: 1001px) and (min-height: 700px) {
   .screen--waiting {
     height: 100dvh;
     min-height: 0;
@@ -1091,15 +1091,9 @@
   }
 }
 
-/* ห้องรอจอเตี้ย (สูง ≤ 820px = โน้ตบุ๊ก 768/780 ทั่วไป): กล่องชิปหมวดคำเหลือแถวเดียว
-   ไม่งั้นการ์ดตั้งค่าจะสูงขึ้นแล้วดันการ์ด Mini Challenge ตกจอ (หน้านี้ล็อกความสูงไว้ที่ 100dvh) */
-@media (min-width: 1001px) and (max-height: 820px) {
-  .cat-chips {
-    max-height: 34px;
-  }
-}
-
-@media (min-width: 1001px) and (min-height: 600px) and (max-height: 760px) {
+/* จอเตี้ย (≤820px): ย่อการ์ด Mini Challenge ด้วย (ซ่อนคำอธิบาย เหลือชื่อ+ป้าย) — คืนที่ให้การ์ดตั้งค่า
+   ⚠️ เดิมช่วงนี้เริ่มที่ ≤760px ทำให้จอ 768/780 (โน้ตบุ๊กทั่วไป) ยังใช้การ์ดก้อนโต แล้วการ์ดตั้งค่าไม่พอที่ */
+@media (min-width: 1001px) and (min-height: 700px) and (max-height: 820px) {
   .wr__left {
     grid-template-rows: minmax(285px, 1fr) auto;
   }
@@ -1214,7 +1208,7 @@
   letter-spacing: 0.04em;
 }
 
-@media (min-width: 1001px) and (min-height: 600px) {
+@media (min-width: 1001px) and (min-height: 700px) {
   /* ความสูงการ์ดคงที่ทุกใบ (รวมที่นั่งว่าง) ไม่ยืดตามความสูงคอลัมน์ */
   .wr-card--players > .player-list {
     align-content: start;
@@ -1248,5 +1242,154 @@
   .wr-card--players .team-col .player-card__seat {
     width: 26px;
     height: 26px;
+  }
+}
+
+/* ==========================================================================
+   แก้เลย์เอาต์ห้องรอ (15 ต.ค.) — กล่องที่ 7 "หมวดหมู่คำ" ถูกการ์ด Mini Challenge ทับ
+   สาเหตุ: การ์ด "ตั้งค่าเกม" มี 4 แถวแล้ว แต่พื้นที่ที่ล็อกไว้ (100dvh) ไม่พอ
+   เนื้อหาจึงล้นออกนอกการ์ดไปวาดทับการ์ด Mini Challenge ที่อยู่ถัดลงมา (overflow เห็นอยู่)
+   แก้เป็นชั้น ๆ (รายละเอียด + เหตุผลของทุกตัวเลขอยู่ใน DESIGN.md หัวข้อ "แก้เลย์เอาต์ห้องรอ")
+     1) การ์ดตั้งค่าห้ามเนื้อหาล้นออกไปข้างนอกเด็ดขาด (overflow: hidden) — กันทับเพื่อนบ้านทุกขนาดจอ
+     2) กล่องตัวเลือกเลื่อนในตัวเองได้ + แถวสูงอย่างน้อยเท่าเนื้อหาจริง (minmax(auto, 1fr))
+     3) จอสูง ≤1020px ใช้เลย์เอาต์ตัวเลือกแบบกระชับ (แยกสองแบบตามความกว้าง — ดูบล็อกถัดไป)
+     4) จอสูง < 700px ไม่ล็อกความสูงหน้า (ให้เลื่อนตามปกติ ดีกว่าเบียดกัน) — อยู่ใน @media ด้านบน
+   ========================================================================== */
+@media (min-width: 1001px) and (min-height: 700px) {
+  .wr-card--settings {
+    overflow: hidden; /* เนื้อหาล้น = ถูกตัดในกรอบ ไม่ลามไปทับการ์ด Mini Challenge */
+  }
+
+  .wr-opts {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* แถวสูงอย่างน้อยเท่าเนื้อหาจริง (auto) แล้วที่เหลือค่อยแบ่งให้เท่ากัน (1fr)
+       ⚠️ ห้ามใช้ minmax(0, 1fr) เฉย ๆ — แถวจะถูกบีบต่ำกว่าเนื้อหาแล้วล้นออกนอกการ์ด
+       (นั่นคือสาเหตุเดิมที่กล่องหมวดหมู่คำไปโผล่ใต้การ์ด Mini Challenge) */
+    grid-auto-rows: minmax(auto, 1fr);
+  }
+
+  /* เงาจางบอกว่ามีเนื้อหาต่อ — เฉพาะตอนที่รายชื่อยาวกว่ากรอบจริง (มาสคอต/ปุ่มเริ่มเกมไม่ถูกเนื้อหาทับอีก) */
+  .wr-card--players.wr-card--waiting > .player-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent 100%);
+  }
+
+  .wr-card--players.wr-card--waiting > .player-list .player-card--empty:last-child {
+    margin-bottom: 22px; /* ที่นั่งสุดท้ายโผล่พ้นเงาได้ ไม่ถูกกลืนทั้งใบ */
+  }
+}
+
+/* ==========================================================================
+   จอที่ไม่สูงมาก (≤1020px) — ทางที่เลือกแก้ "กล่องหมวดหมู่คำถูกตัด/ถูกทับ"
+   วัดแล้ว: แบบเดิม (ป้ายบน–ปุ่มล่าง) ต้องการการ์ดสูง ~622px → ต้องใช้จอสูง ~1010px ขึ้นไป
+   จอ 700–1020px จึงใช้เลย์เอาต์กระชับแทน (ยังล็อกความสูง 100dvh เหมือนเดิม ไม่เลื่อนหน้า)
+     1) จอกว้าง ≥1181px: ช่องตัวเลือกกว้างพอ (~300px) → ป้ายซ้าย–ปุ่มขวา แถวเดียว (เตี้ยลง ~24px)
+     2) จอแคบ 1001–1180px: ช่องแคบ ~200px ใส่ป้ายซ้าย–ปุ่มขวาไม่ได้ (ปุ่มจะเบียดทับป้าย)
+        จึงคงป้ายบน–ปุ่มล่าง แต่ย่นความสูง/ช่องไฟลง
+     3) ทั้งสองแบบ: ชิปหมวดคำเล็กลงหนึ่งขั้น → 10 ใบห่อใน 2 แถว ไม่ถูกซ่อนในกรอบ
+   ========================================================================== */
+@media (min-width: 1181px) and (max-height: 1020px) {
+  .wr-opts .wr-opt {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 0;
+  }
+
+  .wr-opts .wr-opt__head {
+    margin-bottom: 0;
+  }
+
+  .wr-opts .wr-opt__label {
+    white-space: nowrap;
+  }
+}
+
+/* ย่นความสูงของกล่องตัวเลือก/การ์ด (ใช้ทั้งสองช่วงความกว้าง) */
+@media (min-width: 1001px) and (max-height: 1020px) {
+  .wr-opts {
+    gap: 3px;
+  }
+
+  .wr-opts .wr-opt {
+    padding: 2px 6px;
+  }
+
+  .wr-opts .wr-opt--wide .cat-pick {
+    min-width: 0;
+  }
+
+  .wr__left .wr-card--settings {
+    padding: 7px 9px;
+  }
+
+  .wr-card--settings .wr-card__title {
+    font-size: 17px;
+  }
+
+  .wr-card--settings .wr-card__head {
+    margin-bottom: 4px;
+  }
+
+  /* กล่องชิป: ห้ามบีบจนชิปถูกซ่อน — ให้ห่อบรรทัดเท่าที่ต้อง แล้วเล็กลงหนึ่งขั้น */
+  .wr-opts .cat-chips {
+    gap: 4px;
+    max-height: none;
+  }
+
+  .wr-opts .cat-chip {
+    min-height: 28px;
+    padding: 2px 7px;
+    font-size: 12px;
+  }
+}
+
+/* จอแคบ 1001–1180px: ช่องตัวเลือกกว้างแค่ ~200px → คงป้ายบน–ปุ่มล่าง แต่ย่นทุกอย่างลง
+   (ปุ่มยังสูง ≥30px · ชิปหมวดคำ ≥28px) */
+@media (min-width: 1001px) and (max-width: 1180px) and (max-height: 1020px) {
+  .wr-opts .wr-opt {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 1px;
+    padding: 2px 6px;
+  }
+
+  /* ยกเว้นกล่องหมวดหมู่คำ (กว้างเต็ม 2 คอลัมน์) — ใส่ป้ายซ้าย ชิปขวาได้ เพราะช่องกว้างกว่าช่องอื่นเท่าตัว */
+  .wr-opts .wr-opt--wide {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 8px;
+  }
+
+  .wr-opts .wr-opt--wide .wr-opt__head {
+    margin-bottom: 0;
+  }
+
+  .wr-opts .wr-opt--wide .wr-opt__label {
+    white-space: nowrap;
+  }
+
+  .wr-opts .wr-opt__label {
+    font-size: 12px;
+  }
+
+  .wr-opts .wr-opt .seg,
+  .wr--team .wr-opts .wr-opt .seg {
+    min-height: 30px;
+    padding: 1px 4px;
+    font-size: 13px;
+  }
+
+  .wr-card--settings .wr-card__title {
+    font-size: 16px;
+  }
+
+  .wr-card--settings .wr-card__head {
+    margin-bottom: 2px;
   }
 }

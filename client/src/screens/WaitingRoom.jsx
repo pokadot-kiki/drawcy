@@ -249,7 +249,7 @@ export default function WaitingRoom({ room, me, onLeave }) {
                     />
                   ) : (
                     <OptionRow
-                      label="จำนวนผู้เล่นสูงสุด"
+                      label="จำนวนผู้เล่น"
                       choices={maxPlayersChoices()}
                       value={maxPlayers}
                       disabled={!isHost}
@@ -257,7 +257,7 @@ export default function WaitingRoom({ room, me, onLeave }) {
                     />
                   )}
                 </Opt>
-                <Opt n={3} label="เวลาต่อตา (วินาที)">
+                <Opt n={3} label="เวลาต่อตา">
                   <OptionRow
                     label="เวลาวาดต่อตา"
                     choices={TIME_CHOICES}

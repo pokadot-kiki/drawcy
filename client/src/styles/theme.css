@@ -4621,11 +4621,19 @@ select[class] {
   font-weight: 700;
 }
 
-/* จอแคบ: ชิปต้องกดง่าย (≥44px) — ใช้เกณฑ์เดียวกับปุ่มอื่นในหน้า (DESIGN.md) */
+/* จอแคบ: ชิปต้องกดง่าย (≥44px) — ใช้เกณฑ์เดียวกับปุ่มอื่นในหน้า (DESIGN.md)
+   และกล่องชิปห้ามจำกัดความสูงเลย (จอแคบหน้าห้องรอเลื่อนได้อยู่แล้ว) ไม่งั้นชิปท้ายๆ ถูกซ่อนในกรอบ */
 @media (max-width: 1000px) {
   .cat-chip {
     min-height: 44px;
     padding: 4px 12px;
+  }
+
+  .cat-chips,
+  .cat-chips--row {
+    max-height: none;
+    overflow: visible;
+    flex-wrap: wrap;
   }
 }
 
