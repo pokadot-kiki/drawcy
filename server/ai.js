@@ -57,8 +57,22 @@ async function init() {
 }
 
 // คลังคำที่ Solo ใช้สุ่ม: ai-words.json ถ้ามี ไม่งั้นใช้ตัวสำรองที่ index.js ส่งมา
-function soloWords(fallbackBank) {
-  return soloBank || fallbackBank;
+// categories = หมวดที่ผู้เล่นเลือก (ว่าง = ทุกหมวด) → กรองทุกระดับด้วยหมวดเดียวกัน
+// ไม่มีการถอยไปหมวดอื่นเด็ดขาด (ถ้ากรองแล้วว่าง ผู้เรียกต้องดักก่อนเริ่มเกม — index.js ตอบ NOT_ENOUGH_WORDS)
+function soloWords(fallbackBank, categories = []) {
+  const src = soloBank || fallbackBank;
+  const cats = Array.isArray(categories) ? categories : [];
+  if (cats.length === 0) return src;
+  const out = { easy: [], medium: [], hard: [] };
+  for (const level of Object.keys(out)) {
+    out[level] = (Array.isArray(src?.[level]) ? src[level] : []).filter((w) => cats.includes(w.category));
+  }
+  return out;
+}
+
+// จำนวนคำทั้งหมดในคลังที่กรองแล้ว — ใช้เช็คว่า "เลือกหมวดแล้วยังมีคำให้เล่นไหม"
+function countWords(bank) {
+  return ["easy", "medium", "hard"].reduce((n, level) => n + (bank?.[level]?.length ?? 0), 0);
 }
 
 // ด่าน 1–2 = 60 วิ easy · 3–4 = 45 วิ medium · 5+ = 30 วิ hard
@@ -186,4 +200,4 @@ async function guessImage({ image, word, allWords, elapsed, time, wrong }) {
   return { guess, correct: answers.isCorrect(guess, word) }; // รับชื่ออังกฤษ/คำที่นับว่าถูกด้วย (Claude อาจตอบคำพ้อง)
 }
 
-module.exports = { init, soloWords, levelConfig, pickWord, scoreFor, aiMode, guessImage, mockChance, parseImage, sameWord };
+module.exports = { init, soloWords, countWords, levelConfig, pickWord, scoreFor, aiMode, guessImage, mockChance, parseImage, sameWord };

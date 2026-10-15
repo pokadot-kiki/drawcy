@@ -2159,7 +2159,7 @@ async function main() {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const last = (P, name) => P.dump().filter((e) => e.name === name).at(-1)?.args[0];
     // ค่าเริ่มต้นของตัวเลือกห้องที่เพิ่มทีหลัง (ข้อ 32 เทสตัวเลือกพวกนี้โดยตรง)
-    const NEW_DEFAULTS = { difficulty: "easy", visibility: "private", maxPlayers: 8, teams: 2, challenges: ["none", "colour_fix", "dont_lift_pen", "shapes_only"] };
+    const NEW_DEFAULTS = { difficulty: "easy", visibility: "private", maxPlayers: 8, teams: 2, challenges: ["none", "colour_fix", "dont_lift_pen", "shapes_only"], categories: [] };
     const socks = [];
     const make = async (data) => {
       const P = track(await connect()); socks.push(P);
@@ -2644,7 +2644,7 @@ async function main() {
       await wait(150);
       const hid = made.playerId;
       check("create_room รับ difficulty/visibility/challenge และเก็บไว้กับห้อง", last(H, "room_update").settings,
-        { mode: "classic", rounds: 1, drawTime: 30, difficulty: "hard", visibility: "public", maxPlayers: 8, teams: 2, challenges: ["none"] });
+        { mode: "classic", rounds: 1, drawTime: 30, difficulty: "hard", visibility: "public", maxPlayers: 8, teams: 2, challenges: ["none"], categories: [] });
       checkOk("playerId ไม่ใช่ socket.id และเป็นรหัส 20 ตัว (แปลงจากกุญแจ)", hid !== H.socket.id && /^[0-9a-f]{20}$/.test(hid));
       checkOk("กุญแจลับไม่อยู่ใน event ใดๆ ที่ส่งกลับมา", !JSON.stringify(H.dump()).includes(KEY_H));
       check("ผู้เล่นมีช่อง connected: true", last(H, "room_update").players[0].connected, true);
@@ -2652,7 +2652,7 @@ async function main() {
       H.socket.emit("update_settings", { difficulty: "banana", visibility: "secret", challenge: "yes" });
       await wait(150);
       check("ค่าตัวเลือกที่ไม่อนุญาตถูกเมิน", last(H, "room_update").settings,
-        { mode: "classic", rounds: 1, drawTime: 30, difficulty: "hard", visibility: "public", maxPlayers: 8, teams: 2, challenges: ["none"] });
+        { mode: "classic", rounds: 1, drawTime: 30, difficulty: "hard", visibility: "public", maxPlayers: 8, teams: 2, challenges: ["none"], categories: [] });
 
       // ---------- รายการห้อง Public ----------
       const P2 = await connectAs("test-key-private-0123456789");
@@ -3731,6 +3731,223 @@ async function main() {
     check("server รองรับอวตาร 0 ถึง 11 ครบ", received, Array.from({ length: 12 }, (_, i) => i));
     check("เลขอวตารเกินขอบเขตกลับไปตัวแรก", room.players[0].avatar, 0);
     invalid.socket.disconnect();
+  });
+
+
+  // ══════════════════════════════════════════════════════════════════
+  // ข้อ 48 — หมวดหมู่คำ (settings.categories): เลือกหมวดแล้วได้คำจากหมวดนั้นเท่านั้น
+  // ══════════════════════════════════════════════════════════════════
+  await runPart("48. หมวดหมู่คำ — เลือกแล้วได้คำจากหมวดนั้นเท่านั้น · ค่าเพี้ยนถูกเมิน · คำไม่พอเริ่มไม่ได้ · เล่นอีกรอบคงหมวดเดิม", async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const last = (P, name) => P.dump().filter((e) => e.name === name).at(-1)?.args[0];
+    const bank = readWordFile();
+    const LEVELS_TH = ["easy", "medium", "hard"];
+    const fileCats = [...new Set(LEVELS_TH.flatMap((l) => (bank[l] ?? []).map((i) => i.category)))];
+    const wordsIn = (cat, level) => (bank[level] ?? []).filter((i) => i.category === cat).map((i) => i.word);
+
+    // ---------- API รายการหมวด (หน้าเว็บใช้สร้างชิป + บอกจำนวนคำ) ----------
+    const api = await (await fetch(`${URL}/api/word-categories`)).json();
+    check("GET /api/word-categories ส่งชื่อหมวดครบตาม words.json", api.categories.map((c) => c.name).sort(), [...fileCats].sort());
+    check("จำนวนคำต่อหมวด/ระดับตรงกับไฟล์", api.categories.every((c) => LEVELS_TH.every((l) => c.counts[l] === wordsIn(c.name, l).length)), true);
+    check("perTurn = 3 (จำนวนตัวเลือกคำต่อตา)", api.perTurn, 3);
+    // ไม่มีคำจริงหลุดออกไปกับ API (มีแต่ชื่อหมวดกับตัวเลข)
+    const apiText = JSON.stringify(api) + JSON.stringify(await (await fetch(`${URL}/api/word-categories?bank=solo`)).json());
+    // เทียบแบบ "คำเต็ม" (มีเครื่องหมายคำพูดครอบ) เพราะชื่อหมวดของ Solo มีคำไทยเป็นส่วนประกอบได้ เช่น "เสื้อผ้า"
+    check("API หมวดคำไม่มีคำในคลังหลุดออกไปเลย",
+      LEVELS_TH.flatMap((l) => (bank[l] ?? []).map((i) => i.word)).filter((w) => apiText.includes(`"${w}"`)), []);
+    const soloApi = await (await fetch(`${URL}/api/word-categories?bank=solo`)).json();
+    check("bank=solo ตอบชื่อคลังว่า solo และมีหมวดของ Solo", [soloApi.bank, soloApi.categories.length > 0], ["solo", true]);
+
+    // ---------- สร้างห้อง + ตั้งหมวด ----------
+    const H = track(await connect());
+    const made = await emitAck(H.socket, "create_room", { name: "CatH", avatar: 0, rounds: 1, drawTime: 30 });
+    const G = track(await connect());
+    await emitAck(G.socket, "join_room", { code: made.code, name: "CatG", avatar: 1 });
+    await wait(150);
+    check("ห้องใหม่ = ทุกหมวด (อาร์เรย์ว่าง)", last(H, "room_update").settings.categories, []);
+
+    // ค่าเพี้ยนถูกเมินทั้งหมด (ยังคง "ทุกหมวด")
+    const longList = Array.from({ length: 60 }, () => "สัตว์");
+    for (const bad of ["สัตว์", ["ไม่มีหมวดนี้"], longList, 7, null]) H.socket.emit("update_settings", { categories: bad });
+    H.socket.emit("update_settings", { categories: ["ผลไม้"] }); // หมวดของ Solo ไม่มีในคลังห้อง → เมิน
+    await wait(250);
+    check("ค่าเพี้ยน (สตริง/ชื่อที่ไม่มี/ลิสต์ยาวเกิน/หมวดของ Solo) ถูกเมิน → ยังทุกหมวด", last(H, "room_update").settings.categories, []);
+
+    // ส่งซ้ำ + ชื่อที่ไม่มีอยู่ปนมา → เหลือเฉพาะที่รู้จัก ไม่ซ้ำ คงลำดับมาตรฐาน
+    H.socket.emit("update_settings", { categories: ["อาหsาร", "สัตว์", "สัตว์", "อาหาร", "banana"] });
+    await G.wait("room_update", (r) => (r.settings.categories ?? []).length > 0, 2000);
+    check("กรองชื่อที่ไม่มี/ซ้ำออก · เก็บตามลำดับมาตรฐานของ server",
+      last(G, "room_update").settings.categories, fileCats.filter((c) => ["สัตว์", "อาหาร"].includes(c)));
+    check("คนที่ไม่ใช่หัวห้องก็เห็นหมวดที่ตั้งไว้", last(G, "room_update").settings.categories.length, 2);
+
+    // คนที่ไม่ใช่หัวห้องเปลี่ยนไม่ได้
+    G.clear();
+    G.socket.emit("update_settings", { categories: ["กีฬา"] });
+    const nh = await G.wait("game_error", null, 1500);
+    check("คนที่ไม่ใช่หัวห้องเปลี่ยนหมวดไม่ได้", [nh?.code, last(H, "room_update").settings.categories.length], ["NOT_HOST", 2]);
+
+    // ---------- คำไม่พอ: หมวด+ความยากที่ไม่มีคำเลย → ปฏิเสธการเริ่มเกม ----------
+    // หา (ระดับ, หมวด) ที่มีคำน้อยกว่า 3 จากไฟล์จริง (ปัจจุบันคือ อาหาร × ระดับยาก = 0 คำ)
+    const thin = [];
+    for (const l of LEVELS_TH) for (const c of fileCats) if (wordsIn(c, l).length < 3) thin.push({ level: l, cat: c });
+    checkOk(`ในไฟล์มีความยาก+หมวดที่มีคำไม่ถึง 3 อยู่จริง (${thin.length} แบบ)`, thin.length > 0);
+    const bad = thin[0];
+    H.socket.emit("update_settings", { difficulty: bad.level, categories: [bad.cat] });
+    await wait(200);
+    G.clear();
+    G.socket.emit("set_ready", { ready: true });
+    await wait(150);
+    H.clear();
+    H.socket.emit("start_game");
+    const err = await H.wait("game_error", null, 2000);
+    check("คำไม่พอ → NOT_ENOUGH_WORDS พร้อมบอกวี่แค่กี่คำ", [err?.code, /มีคำแค่ \d+ คำ/.test(err?.message ?? "")], ["NOT_ENOUGH_WORDS", true]);
+    check("เกมไม่เริ่มจริง (ไม่มี round_start/choose_word ตามมา)", (await H.quiet("choose_word", 500)).length, 0);
+    // เพิ่มหมวดให้พอ → เริ่มได้ (ไม่ค้าง)
+    H.socket.emit("update_settings", { difficulty: "easy", categories: ["สัตว์", "อาหาร"] });
+    await wait(200);
+    checkOk("ย้ายไปหมวดที่มีคำพอแล้วเริ่มใหม่ได้ (ไม่ค้างที่คำไม่พอ)",
+      wordsIn("สัตว์", "easy").length + wordsIn("อาหาร", "easy").length >= 3);
+
+    // ---------- เริ่มเกมจริง: ตัวเลือกคำต้องมาจากหมวดที่เลือกเท่านั้น ----------
+    const chosenCats = fileCats.filter((c) => ["สัตว์", "อาหาร"].includes(c));
+    const expectPool = chosenCats.flatMap((c) => wordsIn(c, "easy"));
+    // ทั้งสองคนผูก handler ไว้: ตาไหนใครเป็นคนวาด คนนั้นได้ choose_word แล้วเลือกคำ (อีกคนส่งมาก็ถูกเมิน)
+    // ⚠️ จดว่า "ตาไหนใครวาด" ด้วย ไม่งั้นตาที่ 2 (คนวาดสลับคน) จะรอผิด socket
+    let lastChoose = null;
+    let lastWord = null;
+    let drawer = null;
+    // ต้องตอบ word_chosen จาก socket ของ "คนวาดตานั้น" เท่านั้น (ตาที่ 2 คนวาดสลับเป็น G)
+    const onChoose = (P, who) => (d) => { lastChoose = d; lastWord = null; drawer = who; P.socket.emit("word_chosen", { word: d.options[0] }); };
+    H.socket.on("choose_word", onChoose(H, "H"));
+    G.socket.on("choose_word", onChoose(G, "G"));
+    H.socket.on("your_word", (d) => { if (drawer === "H") lastWord = d.word; });
+    G.socket.on("your_word", (d) => { if (drawer === "G") lastWord = d.word; });
+    const until = async (fn, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (fn()) return true; await wait(25); } return false; };
+
+    const playTurn = async (label) => {
+      lastChoose = null;
+      lastWord = null;
+      H.socket.emit("start_game"); // ตาแรกเท่านั้นที่มีผล (ตาต่อไป server ขึ้นตาเอง)
+      checkOk(`${label}: ได้ตัวเลือกคำ`, await until(() => lastChoose, 9000));
+      checkOk(`${label}: ตัวเลือกคำ 3 ตัวมาจากหมวดที่เลือกเท่านั้น`,
+        lastChoose.options.length === 3 && lastChoose.options.every((w) => expectPool.includes(w)));
+      checkOk(`${label}: คำที่ได้อยู่ในหมวดที่เลือก`, await until(() => lastWord, 4000) && expectPool.includes(lastWord));
+      await wait(400); // ให้ server เข้าสู่ช่วงวาดก่อนยิงคำทาย
+      const guesser = drawer === "H" ? G : H;
+      guesser.socket.emit("guess", { text: lastWord });
+      check("หมวดในห้องยังเป็นชุดเดิมระหว่างเกม", last(H, "room_update").settings.categories, chosenCats);
+    };
+    await playTurn("ตาที่ 1");
+    await playTurn("ตาที่ 2");
+
+    // ---------- จบเกม → เล่นอีกรอบ → ยังคงหมวดเดิม ----------
+    H.clear();
+    const over = await H.wait("game_end", null, 12000);
+    checkOk("เล่นครบรอบแล้วจบเกมได้ตามปกติ", !!over);
+    check("จบเกมแล้ว settings.categories ยังอยู่", last(H, "room_update").settings.categories, chosenCats);
+    H.clear();
+    lastChoose = null;
+    H.socket.emit("start_game");
+    checkOk("เล่นอีกรอบยังใช้หมวดเดิม (ไม่มีอะไรรีเซ็ต)",
+      await until(() => lastChoose, 6000) && lastChoose.options.length === 3 && lastChoose.options.every((w) => expectPool.includes(w)));
+
+    H.socket.disconnect();
+    G.socket.disconnect();
+
+    // ---------- Solo: หมวดของคลัง ai-words.json (คนละชุดกับคลังห้อง) ----------
+    const aiFile = JSON.parse(fs.readFileSync(path.join(SERVER_DIR, "data", "ai-words.json"), "utf8"));
+    const aiCats = [...new Set([...(aiFile.easy ?? []), ...(aiFile.medium ?? []), ...(aiFile.hard ?? [])].map((i) => i.category))];
+    const aiWordsOf = (cat) => [...(aiFile.easy ?? []), ...(aiFile.medium ?? []), ...(aiFile.hard ?? [])].filter((i) => i.category === cat).map((i) => i.word);
+    check("bank=solo ส่งชื่อหมวดครบตาม ai-words.json", soloApi.categories.map((c) => c.name).sort(), [...aiCats].sort());
+    // เลือกหมวดเดียวของ Solo → คำที่ได้ต้องอยู่ในหมวดนั้น (สุ่ม 6 เกม ต้องได้คำในหมวดทุกครั้ง)
+    const soloWords = [];
+    for (let i = 0; i < 6; i++) {
+      const S = track(await connect());
+      S.socket.emit("ai_start", { name: `CatSolo${i}`, difficulty: "easy", categories: ["ผลไม้"] });
+      const rs = await S.wait("ai_round_start", null, 4000);
+      soloWords.push(rs.word);
+      S.socket.emit("leave_room");
+      S.socket.disconnect();
+      await wait(60);
+    }
+    const fruits = aiWordsOf("ผลไม้");
+    check("Solo เลือกหมวดผลไม้แล้วได้คำในหมวดนั้นทุกครั้ง", soloWords.filter((w) => fruits.includes(w)).length, soloWords.length);
+    check("Solo ยังไม่ใช้คำซ้ำกันเองในหกเกม (คนละเกม)", new Set(soloWords).size > 1, true);
+    // ค่าเพี้ยน / หมวดของคลังห้องที่ไม่มีในคลัง Solo → ถอยเป็นทุกหมวด ไม่ล่ม
+    const S2 = track(await connect());
+    S2.socket.emit("ai_start", { name: "CatSoloBad", difficulty: "easy", categories: ["ไม่มีหมวดนี้", "มหาวิทยาลัย"] });
+    const badRound = await S2.tryWait("ai_round_start", null, 3000);
+    checkOk("Solo หมวดเพี้ยน → ยังเริ่มเกมได้ (ถอยเป็นทุกหมวด)", !!badRound && typeof badRound.word === "string");
+    S2.socket.emit("leave_room");
+    S2.socket.disconnect();
+  });
+
+
+  // ══════════════════════════════════════════════════════════════════
+  // ข้อ 48.1 — server ตัวที่สองที่คลังคำบางมาก (WORDS_FILE ชี้ไฟล์ชั่วคราว)
+  // ต้อง "ปฏิเสธการเริ่มเกม" เมื่อคำไม่ถึง 3 และเริ่มได้ทันทีเมื่อหมวดรวมกันพอ
+  // (คลังจริงทุกหมวดมี ≥3 คำทุกความยาก เคสนี้จึงต้องสร้างคลัง薄的ขึ้นมาเอง)
+  // ══════════════════════════════════════════════════════════════════
+  await runPart("48.1 คลังคำบาง (คำไม่ถึง 3) — ปฏิเสธการเริ่มเกมด้วย NOT_ENOUGH_WORDS ไม่ค้าง", async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const last = (P, name) => P.dump().filter((e) => e.name === name).at(-1)?.args[0];
+    const thinFile = path.join(SCORES_DIR, "thin-words.json");
+    fs.writeFileSync(thinFile, JSON.stringify({
+      easy: [
+        { word: "แมว", category: "สัตว์", aliases: ["cat"] },
+        { word: "หมา", category: "สัตว์", aliases: ["dog"] },
+        { word: "กล้วย", category: "อาหาร", aliases: ["banana"] },
+      ],
+      medium: [],
+      hard: [],
+    }));
+    const env = { ...process.env, SCORES_FILE, PORT: "3001", AI_MODE: "mock", WORDS_FILE: thinFile, CHALLENGE_NO_PACING: "1", CHALLENGE_ODDS: "0", CHALLENGE_INTRO_MS: "0" };
+    const proc = spawn(process.execPath, ["index.js"], { cwd: SERVER_DIR, stdio: ["ignore", "pipe", "pipe"], env });
+    const log = [];
+    proc.stdout.on("data", (b) => log.push(b.toString()));
+    proc.stderr.on("data", (b) => log.push(b.toString()));
+    const URL2 = "http://localhost:3001";
+    let up = false;
+    for (let i = 0; i < 60 && !up; i++) {
+      await wait(250);
+      up = await fetch(`${URL2}/test.html`).then((r) => r.ok).catch(() => false);
+    }
+    checkOk("server ตัวที่สองสตาร์ทขึ้น (คลังบาง)", up);
+
+    try {
+      const cats = await (await fetch(`${URL2}/api/word-categories`)).json();
+      check("API บอกว่ามีหมวดเดียว 2 คำ (สัตว์) ในคลังบาง", cats.categories.map((c) => [c.name, c.total]), [["สัตว์", 2], ["อาหาร", 1]]);
+
+      const H = track(await connect(URL2));
+      const made = await emitAck(H.socket, "create_room", { name: "ThinH", avatar: 0, rounds: 1, drawTime: 30 });
+      const G = track(await connect(URL2));
+      await emitAck(G.socket, "join_room", { code: made.code, name: "ThinG", avatar: 1 });
+      G.socket.emit("set_ready", { ready: true });
+      await wait(200);
+
+      // เลือกหมวดสัตว์ = 2 คำ (ไม่ถึง 3) → เริ่มไม่ได้ และต้องไม่มีสถานะเกมตามมา
+      H.socket.emit("update_settings", { categories: ["สัตว์"] });
+      await wait(150);
+      H.clear();
+      H.socket.emit("start_game");
+      const err = await H.wait("game_error", null, 2000);
+      check("หมวดสัตว์ (2 คำ) → NOT_ENOUGH_WORDS", [err?.code, /มีคำแค่ 2 คำ/.test(err?.message ?? "")], ["NOT_ENOUGH_WORDS", true]);
+      check("ไม่มีรอบเกมเริ่มตามมา (ไม่ค้าง)", (await H.quiet("round_start", 500)).length, 0);
+      check("ห้องยังอยู่สถานะเดิม (lobby)", last(H, "room_update").status, "lobby");
+
+      // รวมสองหมวด (2+1 = 3 คำ) → เริ่มได้ทันที และตัวเลือกทั้ง 3 มาจากสองหมวดนั้น
+      H.socket.emit("update_settings", { categories: ["สัตว์", "อาหาร"] });
+      await wait(150);
+      let picked = null;
+      H.socket.on("choose_word", (d) => { picked = d.options; H.socket.emit("word_chosen", { word: d.options[0] }); });
+      H.socket.emit("start_game");
+      const cw = await H.wait("choose_word", null, 3000);
+      check("รวมหมวดแล้วได้ครบ 3 คำพอดี · เริ่มเกมได้", [picked.length, cw.options.slice().sort()], [3, ["กล้วย", "หมา", "แมว"]]);
+      const rs = await G.wait("round_start", null, 3000);
+      checkOk("ตานี้เดินต่อได้ตามปกติ", !!rs);
+    } finally {
+      proc.kill();
+    }
   });
 
   // ปิดทุก socket เพื่อให้โปรเซสจบได้

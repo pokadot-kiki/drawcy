@@ -133,6 +133,25 @@ app.get("/api/rooms", (req, res) => {
   res.json({ rooms: list.slice(0, 30) });
 });
 
+// ---------- หมวดหมู่คำที่เลือกได้ (HTTP) ----------
+// หน้าเว็บใช้แสดงชิปเลือกหมวด + บอกว่าหมวดที่เลือกมีความยากนี้อยู่กี่คำ (จะได้รู้ก่อนกดเริ่มว่าไม่พอ)
+// bank=room (ค่าเริ่มต้น) = คลังของโหมดห้อง (words.json) · bank=solo = คลังของ Solo (ai-words.json)
+// ส่งแค่ "ชื่อหมวด + จำนวนคำ" ไม่มีคำใดๆ ของเกมออกไป
+app.get("/api/word-categories", (req, res) => {
+  try {
+    const bank = req.query.bank === "solo" ? ai.soloWords(WORD_BANK) : WORD_BANK;
+    res.json({
+      bank: req.query.bank === "solo" ? "solo" : "room",
+      levels: LEVELS,
+      perTurn: WORDS_PER_TURN,
+      categories: categorySummary(bank),
+    });
+  } catch (err) {
+    console.warn("ดึงรายการหมวดคำไม่สำเร็จ:", err.message);
+    res.status(500).json({ error: "SERVER_ERROR" });
+  }
+});
+
 // ---------- เสิร์ฟหน้าเว็บของเกม (client ที่ build แล้ว) ----------
 // เปิด http://localhost:3000 แล้วเล่นได้เลย ไม่ต้องรัน vite · สร้างไฟล์ด้วย npm run setup (หรือ cd client && npm run build)
 // ลำดับสำคัญ: /api, /socket.io, /test.html ถูกจัดการไปแล้วข้างบน/ที่ socket.io จึงไม่โดนทับ
@@ -349,7 +368,7 @@ function nextTeamTurn(room) {
   room.round = Math.floor(room.teamTurn / room.teamPerRound) + 1;
   room.teamTurn++;
   room.phase = "choosing";
-  room.wordOptions = pickWords(3, room.settings.difficulty); // สองทีมได้ตัวเลือกชุดเดียวกัน คนวาดคนไหนเลือกก่อน คำนั้นใช้กับทั้งสองทีม
+  room.wordOptions = pickWords(3, room.settings.difficulty, room.settings.categories); // สองทีมได้ตัวเลือกชุดเดียวกัน คนวาดคนไหนเลือกก่อน คำนั้นใช้กับทั้งสองทีม
   const challenge = rollChallenge(room); // Mini Challenge เดียวกันทั้งสองทีม
   for (const lane of laneList(room)) {
     if (lane.drawerId) io.to(lane.drawerId).emit("choose_word", { options: room.wordOptions, time: 10, challenge });
@@ -424,15 +443,18 @@ function handleTeamGuess(socket, room, player, text) {
 // ---------- คลังคำ ----------
 // อ่านจาก server/data/words.json ตอนสตาร์ท แยกเป็น 3 ระดับ
 // ถ้าไฟล์หายหรือ JSON เสีย ให้ใช้คำสำรอง 10 คำเดิม — server ต้องเปิดได้เสมอ ห้ามล่ม
-const WORDS_FILE = __dirname + "/data/words.json";
+// WORDS_FILE เป็น env ไว้ให้เทสชี้ไปไฟล์ชุดอื่น (ทดสอบกรณี "หมวดที่เลือกมีคำไม่พอ") ใช้งานจริงไม่ต้องตั้ง
+const WORDS_FILE = process.env.WORDS_FILE || __dirname + "/data/words.json";
 const LEVELS = ["easy", "medium", "hard"];
 const MAX_WORD_LENGTH = 12; // ยาวเกินนี้จะเตือนใน log แต่ยังใช้คำนั้นตามปกติ ไม่ตัดทิ้ง
 const FALLBACK_WORDS = ["แมว", "หมา", "บ้าน", "รถไฟ", "ร่ม", "ดอกไม้", "ปลา", "ต้นไม้", "จักรยาน", "ไอศกรีม"];
 
 // แยกเก็บตามระดับ พร้อมหมวดหมู่ เผื่อไว้ให้ข้อ 7 (Solo) ไล่ความยากทีละขั้น
 const WORD_BANK = { easy: [], medium: [], hard: [] };
-// ชื่อคำล้วนๆ ทุกระดับรวมกัน โหมดปกติสุ่มจากก้อนนี้
+// ชื่อคำล้วนๆ ทุกระดับรวมกัน โหมดปกติสุ่มจากก้อนนี้ (ตอนไม่ได้เลือกหมวด)
 let ALL_WORDS = [];
+// ชื่อหมวดทั้งหมดที่โหลดได้จากไฟล์ เรียงตามลำดับที่เจอครั้งแรก — เป็นรายการเดียวที่ "ยอมรับ" ใน settings.categories
+let WORD_CATEGORIES = [];
 
 function loadWords() {
   let data = null;
@@ -450,7 +472,10 @@ function loadWords() {
       const word = typeof item?.word === "string" ? item.word.trim() : "";
       if (!word || seen.has(word)) continue;
       seen.add(word);
-      WORD_BANK[level].push({ word, category: typeof item?.category === "string" ? item.category : "" });
+      const category = typeof item?.category === "string" ? item.category.trim() : "";
+      WORD_BANK[level].push({ word, category });
+      // เก็บชื่อหมวดตามลำดับที่เจอครั้งแรก (ตัวเลือกที่หน้าเว็บโชว์ + รายการที่ server ยอมรับ)
+      if (category && !WORD_CATEGORIES.includes(category)) WORD_CATEGORIES.push(category);
       answers.register(word, item?.aliases); // คำที่นับว่าถูก (เก็บที่ server เท่านั้น ไม่ส่งออก)
     }
   }
@@ -459,6 +484,7 @@ function loadWords() {
 
   if (ALL_WORDS.length === 0) {
     WORD_BANK.easy = FALLBACK_WORDS.map((word) => ({ word, category: "สำรอง" }));
+    WORD_CATEGORIES = ["สำรอง"];
     ALL_WORDS = [...FALLBACK_WORDS];
     console.log(`คลังคำ: ใช้คำสำรอง ${ALL_WORDS.length} คำ (อ่าน words.json ไม่ได้)`);
     return;
@@ -476,16 +502,70 @@ function loadWords() {
   console.log(
     `คลังคำ: ${LEVELS.map((l) => `${l} ${WORD_BANK[l].length}`).join(" / ")} (รวม ${ALL_WORDS.length} คำ) จาก words.json`
   );
+  console.log(`หมวดคำ: ${WORD_CATEGORIES.length} หมวด — ${WORD_CATEGORIES.join(" · ")}`);
 }
 
 loadWords();
 
-// สุ่มคำจากระดับความยากที่ห้องเลือก (settings.difficulty: easy | medium | hard)
-// ระดับนั้นมีคำไม่พอ (เช่นตอนใช้คำสำรองที่มีแต่ easy) → ใช้ทุกระดับปนกัน เกมต้องเดินต่อได้เสมอ
-function pickWords(n, difficulty) {
-  const level = (WORD_BANK[difficulty] || []).map((item) => item.word);
-  const pool = level.length >= n ? level : ALL_WORDS;
-  return [...pool].sort(() => Math.random() - 0.5).slice(0, n);
+// ---------- หมวดหมู่คำ (settings.categories) ----------
+// กติกา: **อาร์เรย์ว่าง = ทุกหมวด** (ค่าเริ่มต้น) · ส่งชื่อหมวดที่ไม่มีอยู่/ซ้ำ → กรองออก
+// เลือกหมวดแล้วต้องได้คำจากหมวดนั้นเท่านั้น ห้ามถอยไปหมวดอื่น (ไม่งั้นผิดกติกาที่หัวห้องตั้งไว้)
+const WORDS_PER_TURN = 3; // จำนวนตัวเลือกคำต่อตา (เลือกคำ 3 ตัว) — น้อยกว่านี้เริ่มเกมไม่ได้
+const MAX_CATEGORY_PICKS = 50; // เพดานกันข้อมูลเพี้ยนยาวเกินเหตุ (หมวดจริงมีไม่ถึงสิบ)
+
+// กรองลิสต์หมวดที่ client ส่งมา → คืนอาร์เรย์ชื่อหมวดที่รู้จัก (คงลำดับมาตรฐาน ไม่ซ้ำ)
+// known = รายชื่อหมวดที่ยอมรับ (โหมดห้องใช้ words.json · Solo ใช้ ai-words.json ซึ่งคนละชุดกัน)
+// คืน undefined = "ไม่แก้ค่าที่เก็บไว้" (ไม่ได้ส่งมา · ไม่ใช่ลิสต์ · ส่งแต่ชื่อที่ไม่มีอยู่)
+// คืน [] = ทุกหมวด (ผู้เล่นกด "ทุกหมวด")
+function sanitizeCategories(list, known = WORD_CATEGORIES) {
+  if (!Array.isArray(list) || list.length > MAX_CATEGORY_PICKS) return undefined;
+  const set = known.filter((c) => list.includes(c));
+  if (list.length > 0 && set.length === 0) return undefined;
+  return set;
+}
+
+// ชื่อหมวดของคลัง Solo (ai-words.json หรือคลังสำรอง) — คนละชุดกับคลังห้อง ต้องตรวจด้วยรายการนี้
+const soloCategoryNames = () => categorySummary(ai.soloWords(WORD_BANK)).map((c) => c.name);
+
+// คำทั้งหมดที่ใช้ได้กับระดับความยาก + หมวดที่เลือก (ว่าง = ทุกหมวด) — ยังไม่ถอยไปหมวดอื่น
+function wordPool(difficulty, categories) {
+  const level = WORD_BANK[difficulty] || [];
+  const cats = Array.isArray(categories) ? categories : [];
+  const pool = cats.length === 0 ? level : level.filter((it) => cats.includes(it.category));
+  return pool.map((it) => it.word);
+}
+
+// ก้อนคำจริงของตา (ทั้งตอนสุ่มและตอนเช็คว่าเริ่มเกมได้) — สองที่นี้ต้องใช้ตัวเดียวกันเสมอ
+// ไม่เลือกหมวด: ระดับนั้นมีคำไม่พอ (เช่นใช้คำสำรองที่มีแต่ easy) → ทุกระดับปนกัน เหมือนเดิมทุกอย่าง
+// เลือกหมวด: เฉพาะหมวดนั้น ห้ามถอยไปหมวดอื่นแม้จะไม่พอ (ไม่งั้นผิดกติกาที่หัวห้องตั้งไว้)
+function turnPool(n, difficulty, categories) {
+  const cats = Array.isArray(categories) ? categories : [];
+  const own = wordPool(difficulty, cats);
+  if (cats.length > 0) return own;
+  return own.length >= n ? own : ALL_WORDS;
+}
+
+// สุ่มคำของตา
+function pickWords(n, difficulty, categories) {
+  const pool = turnPool(n, difficulty, categories);
+  // กันเกมค้างเท่านั้น (start_game ปฏิเสธไปแล้วถ้าคำไม่พอ) — ไม่มีทางเลือกอื่นที่ดีกว่าในจังหวะนั้น
+  const safe = pool.length > 0 ? pool : ALL_WORDS;
+  return [...safe].sort(() => Math.random() - 0.5).slice(0, n);
+}
+
+// สรุปจำนวนคำต่อหมวด (ให้หน้าเว็บรู้ว่าเลือกหมวดไหนแล้วมีคำพอไหม) — ไม่มีคำ ไม่มีคำตอบ
+function categorySummary(bank) {
+  const map = new Map();
+  for (const level of LEVELS) {
+    for (const it of bank[level] || []) {
+      if (!it.category) continue;
+      const row = map.get(it.category) || { name: it.category, counts: { easy: 0, medium: 0, hard: 0 }, total: 0 };
+      row.counts[level]++;
+      row.total++;
+      map.set(it.category, row);
+    }
+  }
+  return [...map.values()].sort((a, b) => b.total - a.total || (a.name < b.name ? -1 : 1));
 }
 
 
@@ -962,7 +1042,7 @@ function nextTurn(room) {
   if (!nextDrawer || nextDrawer.connected === false) return nextTurn(room);
 
   room.phase = "choosing";
-  room.wordOptions = pickWords(3, room.settings.difficulty);
+  room.wordOptions = pickWords(3, room.settings.difficulty, room.settings.categories);
   // บอกคนวาดก่อนเลือกคำว่าตานี้มี Mini Challenge อะไร (ส่งถึงคนวาดคนเดียว)
   io.to(room.drawerId).emit("choose_word", { options: room.wordOptions, time: 10, challenge: rollChallenge(room) });
   room.chooseEndsAt = Date.now() + CHOOSE_MS;
@@ -1083,6 +1163,10 @@ function applySettings(room, data) {
   if ([1, 2, 3, 4, 5].includes(rounds)) room.settings.rounds = rounds;
   if ([30, 45, 60, 90].includes(drawTime)) room.settings.drawTime = drawTime;
   if (LEVELS.includes(data?.difficulty)) room.settings.difficulty = data.difficulty; // ระดับของ "ชุดคำ" เท่านั้น ไม่เกี่ยวกับเวลา
+  // หมวดหมู่คำที่ใช้ในเกม (อาร์เรย์ว่าง = ทุกหมวด) · ชื่อหมวดที่ไม่มีอยู่/ซ้ำถูกกรองออก
+  // ส่งแต่ชื่อที่ไม่มีอยู่เลย = เมินทั้งค่า (ไม่รีเซ็ตเป็นทุกหมวดให้เงียบ ๆ ผิดจากที่หัวห้องตั้งใจ)
+  const cats = sanitizeCategories(data?.categories);
+  if (cats !== undefined) room.settings.categories = cats;
   if (data?.visibility === "public" || data?.visibility === "private") room.settings.visibility = data.visibility;
   // ชุดกติกาที่เปิด (ใบไหนบ้าง) · รองรับค่าเดิม challenge: boolean ไว้ด้วย (true = ชุดเริ่มต้น · false = เปิดแค่ Standard)
   const sc = sanitizeChallenges(data?.challenges);
@@ -1265,6 +1349,12 @@ function soloConfig(solo) {
   return solo.difficulty ? { ...cfg, difficulty: solo.difficulty } : cfg;
 }
 
+// คลังคำของ Solo เกมนี้ = คลังปกติกรองด้วยหมวดที่ผู้เล่นเลือกไว้ (ว่าง = ทุกหมวด)
+// เรียกทุกครั้งที่ต้องสุ่ม ไม่แคชไว้ เพราะคลังเป็นก้อนเล็กและคำตอบต้องตรงกับกติกาที่เก็บในเกมเสมอ
+function soloBank(solo) {
+  return ai.soloWords(WORD_BANK, solo?.categories ?? []);
+}
+
 // ส่ง event ของ Solo ถึงผู้เล่นคนนี้ ไม่ว่าตอนนี้เขาต่ออยู่ด้วย socket ตัวไหน (หลุดอยู่ = ไม่มีใครรับ ก็หายไปเฉยๆ)
 function emitSolo(solo, event, data) {
   io.to(solo.pid).emit(event, data);
@@ -1307,7 +1397,7 @@ function clearStrokeTimers(solo) {
 function startSoloRound(solo) {
   const cfg = soloConfig(solo);
   const time = SOLO_TIME_OVERRIDE || cfg.time;
-  const word = ai.pickWord(ai.soloWords(WORD_BANK), cfg.difficulty, solo.usedWords);
+  const word = ai.pickWord(soloBank(solo), cfg.difficulty, solo.usedWords);
   solo.usedWords.add(word);
   solo.word = word;
   solo.time = time;
@@ -1318,7 +1408,7 @@ function startSoloRound(solo) {
   solo.guessLog = []; // คำที่ AI เดาในด่านนี้ (ส่งคืนตอน ai_resume)
   solo.drawing = true;
   solo.resting = false;
-  solo.drawNext = aiDrawings.available(ai.soloWords(WORD_BANK), cfg.difficulty); // ด่านนี้จะมีช่องสองต่อท้ายไหม
+  solo.drawNext = aiDrawings.available(soloBank(solo), cfg.difficulty); // ด่านนี้จะมีช่องสองต่อท้ายไหม
   solo.roundId++;
   clearTimeout(solo.roundTimer);
   solo.roundTimer = setTimeout(() => endSoloRound(solo, false), time * 1000);
@@ -1373,7 +1463,7 @@ function advanceSolo(solo) {
 // ⚠️ ห้ามให้คำตอบ (ทั้งไทย/อังกฤษ) อยู่ใน event ใดก่อน ai_draw_end — ส่งได้แค่หมวดหมู่เป็นคำใบ้
 function startDrawRound(solo) {
   const cfg = soloConfig(solo);
-  const picked = aiDrawings.pick(ai.soloWords(WORD_BANK), cfg.difficulty, solo.usedWords);
+  const picked = aiDrawings.pick(soloBank(solo), cfg.difficulty, solo.usedWords);
   if (!picked) return advanceSolo(solo); // ไม่มีภาพ → ข้ามช่องสอง ไม่ล่ม
   const time = SOLO_TIME_OVERRIDE || cfg.time;
   solo.usedWords.add(picked.word);
@@ -1487,7 +1577,7 @@ async function handleSoloSnapshot(socket, data) {
     const { guess, correct } = await ai.guessImage({
       image,
       word: solo.word,
-      allWords: Object.values(ai.soloWords(WORD_BANK)).flat().map((w) => w.word),
+      allWords: Object.values(soloBank(solo)).flat().map((w) => w.word),
       elapsed: (now - solo.startedAt) / 1000,
       time: solo.time,
       wrong: solo.wrong,
@@ -1575,7 +1665,7 @@ io.on("connection", (socket) => {
       hostId: socket.data.pid,
       status: "lobby",
       players: [{ id: socket.data.pid, name, avatar: cleanAvatar(data.avatar), score: 0, isHost: true, team: null, connected: true, ready: false }],
-      settings: { mode: "classic", rounds: 3, drawTime: 60, difficulty: "easy", visibility: "private", maxPlayers: MAX_PLAYERS, teams: DEFAULT_TEAMS, challenges: [...DEFAULT_CHALLENGES] },
+      settings: { mode: "classic", rounds: 3, drawTime: 60, difficulty: "easy", visibility: "private", maxPlayers: MAX_PLAYERS, teams: DEFAULT_TEAMS, challenges: [...DEFAULT_CHALLENGES], categories: [] },
     };
     const ownerHash = hashOwnerKey(data?.nameOwnerKey);
     if (ownerHash) room.nameOwnerKeys.set(socket.data.pid, ownerHash);
@@ -1743,6 +1833,18 @@ io.on("connection", (socket) => {
       return socket.emit("game_error", {
         code: "TEAMS_UNBALANCED",
         message: `ทีมไม่สมดุล (${activeTeams(room).map((t) => `${t} ${teamCount(room, t)} คน`).join(" · ")}) แต่ละทีมต้องต่างกันไม่เกิน 1 คน กด "จัดทีมให้สมดุล" ก่อน`,
+      });
+    }
+    // หมวดที่เลือก + ความยากที่เลือก ต้องมีคำพอให้เสนอตัวเลือกครบหนึ่งตา ไม่งั้นเริ่มแล้วเกมพังกลางทาง
+    // (คำซ้ำกันหลายตายังยอมให้เล่นได้ แต่คำไม่ถึง 3 คำ = เลือกคำไม่ได้เลย จึงปฏิเสธตั้งแต่ตรงนี้)
+    const pool = turnPool(WORDS_PER_TURN, room.settings.difficulty, room.settings.categories);
+    if (pool.length < WORDS_PER_TURN) {
+      const cats = room.settings.categories ?? [];
+      return socket.emit("game_error", {
+        code: "NOT_ENOUGH_WORDS",
+        message:
+          `หมวดที่เลือก${cats.length > 0 ? ` (${cats.join(" · ")})` : ""} กับความยาก "${room.settings.difficulty}" มีคำแค่ ${pool.length} คำ ` +
+          `— ต้องมีอย่างน้อย ${WORDS_PER_TURN} คำ ลองเลือกหมวดเพิ่มหรือเปลี่ยนความยาก`,
       });
     }
     room.status = "playing";
@@ -1968,11 +2070,20 @@ io.on("connection", (socket) => {
     if (!isNameAllowed(name)) return socket.emit("game_error", { code: "NAME_NOT_ALLOWED", message: "ชื่อนี้ไม่เหมาะสม ลองชื่ออื่นนะ" });
     const nameError = nameOwnerOk(socket, name, data?.nameOwnerKey);
     if (nameError) return socket.emit("game_error", { code: nameError, message: nameError === "NAME_OWNED" ? "ชื่อนี้มีเจ้าของแล้ว ลองชื่ออื่นนะ" : "ลองใหม่อีกครั้งในอีกสักครู่" });
+    // หมวดคำที่เลือก (ไม่ส่ง = ทุกหมวด) · ต้องเหลือคำจริงหลังกรอง ไม่งั้นเริ่มเกมไม่ได้
+    // เช็คก่อนออกจากห้อง เพื่อไม่ให้ "คำขอที่ผิดกติกา" เตะผู้เล่นออกจากห้องที่เขาอยู่
+    const categories = sanitizeCategories(data?.categories, soloCategoryNames()) ?? [];
+    if (ai.countWords(ai.soloWords(WORD_BANK, categories)) === 0) {
+      return socket.emit("game_error", {
+        code: "NOT_ENOUGH_WORDS",
+        message: `หมวดที่เลือก${categories.length > 0 ? ` (${categories.join(" · ")})` : ""} ไม่มีคำให้เล่นเลย ลองเลือกหมวดอื่น`,
+      });
+    }
     leaveRoom(socket); // ผู้เล่นหนึ่งคนอยู่ได้อย่างเดียว: ห้อง หรือ Solo
     stopSolo(socket);  // กดเริ่มซ้ำ = เริ่มเกมใหม่ เกมเก่าทิ้ง (รวมเกมที่ค้างอยู่ใต้ playerId เดียวกัน)
     const solo = {
       pid: socket.data.pid,
-      name, avatar: cleanAvatar(data?.avatar), nameOwnerKey: data?.nameOwnerKey, difficulty: LEVELS.includes(data?.difficulty) ? data.difficulty : null, level: 1, lives: SOLO_LIVES, totalScore: 0, usedWords: new Set(), roundId: 0,
+      name, avatar: cleanAvatar(data?.avatar), nameOwnerKey: data?.nameOwnerKey, difficulty: LEVELS.includes(data?.difficulty) ? data.difficulty : null, categories, level: 1, lives: SOLO_LIVES, totalScore: 0, usedWords: new Set(), roundId: 0,
       over: false, drawing: false, busy: false, roundTimer: null, nextTimer: null, dropTimer: null,
       guessing: false, resting: false, drawNext: false, passed: false, strokeTimers: [],
     };
