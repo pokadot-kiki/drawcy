@@ -11,8 +11,10 @@ import { Icon } from "../components/Icons";
 import { copyText, inviteUrl } from "../invite";
 import OptionRow from "../components/OptionRow";
 import ChallengeCards from "../components/ChallengeCards";
+import CategoryChips from "../components/CategoryChips";
+import { useWordCategories } from "../hooks/useWordCategories";
 import Chat from "../components/Chat";
-import { DIFFICULTY_CHOICES, VISIBILITY_CHOICES, DEFAULT_CHALLENGES, MAX_PLAYERS_LIMIT, maxPlayersChoices, TEAM_COUNT_CHOICES, TEAM_MIN_PLAYERS, teamIdsOf, teamCapOf, minPlayersForTeams } from "../roomOptions";
+import { DIFFICULTY_CHOICES, VISIBILITY_CHOICES, DEFAULT_CHALLENGES, MAX_PLAYERS_LIMIT, maxPlayersChoices, TEAM_COUNT_CHOICES, TEAM_MIN_PLAYERS, teamIdsOf, teamCapOf, minPlayersForTeams, categoryPool, countsKnown } from "../roomOptions";
 
 // ค่าที่ server ยอมรับ ตาม events.md (ค่าอื่น server จะเมิน)
 const ROUND_CHOICES = [1, 2, 3, 4, 5].map((n) => [n, String(n)]);
@@ -60,11 +62,21 @@ export default function WaitingRoom({ room, me, onLeave }) {
   const meInRoom = room.players.find((p) => p.id === me?.playerId);
   const myTeam = meInRoom?.team ?? null;
   const myReady = meInRoom?.ready ?? false;
+  // ชื่อหมวดที่เลือกอยู่ (ว่าง = ทุกหมวด) — เก็บไว้ใน settings ของห้องที่ server ส่งมา
+  const categories = room.settings.categories ?? [];
+  const wordCats = useWordCategories("room");
   // ผู้เล่นคนอื่น (ไม่ใช่หัวห้อง) ต้องกด Ready ครบทุกคน หัวห้องจึงเริ่มได้ (หัวห้องไม่ต้องกด)
   const others = room.players.filter((p) => p.id !== room.hostId);
   const allReady = others.length > 0 && others.every((p) => p.ready);
   const enoughPlayers = teamMode ? teamsReady && teamsBalanced : room.players.length >= 2;
-  const canStart = enoughPlayers && allReady;
+  // หมวดที่เลือก + ความยากที่เลือก ต้องมีคำพอเสนอตัวเลือกครบหนึ่งตา ไม่งั้น server ปฏิเสธ (NOT_ENOUGH_WORDS)
+  // ที่นี่ปิดปุ่มไว้ก่อนพร้อมบอกเหตุผล — ไม่รู้จำนวนคำ (ดึง API ไม่ได้) = ไม่ปิดปุ่ม ให้ server ตัดสิน
+  const catList = wordCats.categories;
+  const catPool = categoryPool(catList, categories, room.settings.difficulty, "room");
+  const wordsReady = !countsKnown(catList) || catPool >= wordCats.perTurn;
+  // เกมนี้มีกี่ตา (ใช้เตือนว่าคำจะซ้ำไหม) — classic = ทุกคนวาดคนละตาต่อรอบ · ทีม = ทีมที่ใหญ่ที่สุดวาดครบต่อรอบ
+  const turns = room.settings.rounds * (teamMode ? Math.max(1, ...sizes) : Math.max(1, room.players.length));
+  const canStart = enoughPlayers && allReady && wordsReady;
 
   useEffect(() => {
     setChatMessages([]);
@@ -281,6 +293,18 @@ export default function WaitingRoom({ room, me, onLeave }) {
                     onChange={(visibility) => changeSetting({ visibility })}
                   />
                 </Opt>
+                {/* หมวดหมู่คำ: เลือกได้หลายหมวด · ไม่เลือกเลย = ทุกหมวด (เหมือนเดิม) · กินเต็มสองคอลัมน์เพราะชื่อหมวดยาว */}
+                <Opt n={7} label="หมวดหมู่คำ" wide>
+                  <CategoryChips
+                    list={catList}
+                    value={categories}
+                    difficulty={room.settings.difficulty}
+                    turns={turns}
+                    perTurn={wordCats.perTurn}
+                    disabled={!isHost}
+                    onChange={(categories) => changeSetting({ categories })}
+                  />
+                </Opt>
               </div>
             </section>
 
@@ -394,7 +418,12 @@ export default function WaitingRoom({ room, me, onLeave }) {
                         : `ทีมไม่สมดุล (${sizesText}) ทุกทีมต้องต่างกันไม่เกิน 1 คน กด "จัดทีมให้สมดุล" ก่อนเริ่มเกม`}
                   </p>
                 )}
-                {isHost && enoughPlayers && !allReady && (
+                {isHost && enoughPlayers && !wordsReady && (
+                  <p className="form-note form-note--error">
+                    หมวดที่เลือกกับความยากนี้มีคำไม่พอ ({catPool} คำ) — เลือกหมวดเพิ่มหรือเปลี่ยนความยากก่อนเริ่มเกม
+                  </p>
+                )}
+                {isHost && enoughPlayers && wordsReady && !allReady && (
                   <p className="form-note">รอผู้เล่นคนอื่นกด "พร้อม" ให้ครบทุกคนก่อนเริ่มเกม</p>
                 )}
                 {isHost && canStart && <p className="form-note form-note--ok">ทุกคนพร้อมแล้ว เริ่มเกมได้เลย!</p>}

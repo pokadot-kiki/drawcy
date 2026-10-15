@@ -1091,6 +1091,14 @@
   }
 }
 
+/* ห้องรอจอเตี้ย (สูง ≤ 820px = โน้ตบุ๊ก 768/780 ทั่วไป): กล่องชิปหมวดคำเหลือแถวเดียว
+   ไม่งั้นการ์ดตั้งค่าจะสูงขึ้นแล้วดันการ์ด Mini Challenge ตกจอ (หน้านี้ล็อกความสูงไว้ที่ 100dvh) */
+@media (min-width: 1001px) and (max-height: 820px) {
+  .cat-chips {
+    max-height: 34px;
+  }
+}
+
 @media (min-width: 1001px) and (min-height: 600px) and (max-height: 760px) {
   .wr__left {
     grid-template-rows: minmax(285px, 1fr) auto;

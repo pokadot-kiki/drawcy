@@ -233,9 +233,9 @@ export default function App() {
           onBack={goHome}
           onEntered={handleEntered}
           onError={(code) => showToast(errorText(code))}
-          // เลือกโหมด "แข่งกับ AI" แล้วกดเริ่มเกม → ไปหน้า Solo แล้วเริ่มทันทีด้วยความยากที่เลือก
-          onStartSolo={(difficulty) => {
-            setSoloBoot({ difficulty });
+          // เลือกโหมด "แข่งกับ AI" แล้วกดเริ่มเกม → ไปหน้า Solo แล้วเริ่มทันทีด้วยความยาก/หมวดที่เลือก
+          onStartSolo={({ difficulty, categories }) => {
+            setSoloBoot({ difficulty, categories });
             navigate("/solo");
           }}
         />

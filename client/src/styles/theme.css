@@ -3503,6 +3503,62 @@ select[class] {
   gap: 10px;
 }
 
+/* หมวดคำของ Solo: ป้ายสั้นอยู่ซ้าย · ชิปเป็นแถวเดียวเลื่อนแนวนอนอยู่ขวา (ความสูงเพิ่มแค่แถวชิปแถวเดียว) */
+.setup__cats {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
+  align-items: start;
+}
+
+.setup__cats-label {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--muted);
+  padding-top: 8px; /* ให้อยู่กึ่งกลางกับแถวชิป */
+  white-space: nowrap;
+}
+
+.setup__cats .cat-pick {
+  gap: 4px;
+}
+
+@media (max-width: 620px) {
+  /* จอแคบ: ป้ายขึ้นบรรทัดบน แล้วชิปเต็มแถวล่าง (แตะง่ายกว่า) */
+  .setup__cats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .setup__cats-label {
+    padding-top: 0;
+  }
+}
+
+/* จอเตี้ย (≤820px = โน้ตบุ๊ก 1366×768/1024×768): ย่อแถวหมวดคำของ Solo + ช่องไฟในกล่องตั้งค่า
+   ให้หน้า SET UP ยังพอดีจอเท่าเดิม (ซ่อนบรรทัดสรุปจำนวนคำ — ตัวเลขยังดูได้จาก tooltip ของชิป)
+   ⚠️ ตัวเลือกนี้เขียนแบบเจาะจง `.setup__opts .setup__opt` เพราะ `.setup__opt` เฉย ๆ ข้างบนไฟล์ถูกกฎที่อยู่ล่างกว่าชนะ */
+@media (min-width: 1001px) and (max-height: 820px) {
+  .setup__opts .setup__opt {
+    gap: 4px;
+  }
+
+  .setup__cats .cat-note {
+    display: none;
+  }
+
+  .setup__cats-label {
+    padding-top: 6px;
+    font-size: 13px;
+  }
+
+  .setup__cats .cat-chip {
+    min-height: 30px;
+    padding: 1px 8px;
+    font-size: 13px;
+  }
+}
+
 /* ปุ่มตัวเลขแถวเดียว เท่ากันทุกปุ่ม ใหญ่ ตัวเลขไม่โดนกรอบบีบ */
 .setup__opts .segmented {
   flex-wrap: nowrap;
@@ -4485,6 +4541,91 @@ select[class] {
 @media (max-width: 480px) {
   .challenge-cards {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   ชิปเลือก "หมวดหมู่คำ" (CategoryChips) — ใช้ทั้งห้องรอและหน้า SET UP ของ Solo
+   ค่าที่เก็บคืออาร์เรย์ชื่อหมวด · ไม่เลือกเลย = ทุกหมวด (เหมือนเดิม) · server ตรวจซ้ำเสมอ
+   ========================================================================== */
+.cat-pick {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* กล่องชิป: ห่อบรรทัดได้ แต่ไม่เกิน 2 แถว — เกินกว่านั้นเลื่อนในกรอบ (ห้ามดันปุ่มเริ่มเกม/แชทตกจอ) */
+.cat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 74px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* แถวเดียวเลื่อนแนวนอน (หน้า SET UP ของ Solo ที่พื้นที่สูงมีจำกัด) */
+.cat-chips--row {
+  flex-wrap: nowrap;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+}
+
+.cat-chip {
+  min-height: 34px;
+  padding: 2px 10px;
+  border: var(--border);
+  border-radius: var(--r-sm, 10px);
+  background: var(--tab-idle);
+  color: var(--ink);
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cat-chip--on {
+  background: var(--blue);
+  color: var(--white);
+  box-shadow: var(--shadow-xs);
+}
+
+/* ผู้เล่นทั่วไป: เห็นหมวดที่หัวห้องตั้งไว้ แต่กดไม่ได้ (ตัวที่เลือกยังเด่นอยู่) */
+.cat-chip:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.cat-chip--on:disabled {
+  opacity: 1;
+}
+
+.cat-note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.cat-note--warn {
+  color: #8a5b00;
+  font-weight: 700;
+}
+
+.cat-note--bad {
+  color: var(--red);
+  font-weight: 700;
+}
+
+/* จอแคบ: ชิปต้องกดง่าย (≥44px) — ใช้เกณฑ์เดียวกับปุ่มอื่นในหน้า (DESIGN.md) */
+@media (max-width: 1000px) {
+  .cat-chip {
+    min-height: 44px;
+    padding: 4px 12px;
   }
 }
 

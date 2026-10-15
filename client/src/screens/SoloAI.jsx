@@ -88,8 +88,9 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
   const [name, setName] = useState(initialName);
   const [nameWarning, setNameWarning] = useState("");
   // ระดับความยากของ "ชุดคำ" ทั้งเกม (เวลายังสั้นลงตามด่านเหมือนเดิม) — server เป็นคนสุ่มคำตามระดับนี้
-  // มาจากหน้า SET UP (boot) ถ้าเข้าทางนั้น ไม่งั้นเริ่มที่ง่าย
+  // มาจากหน้า SET UP (boot) ถ้าเข้าทางนั้น ไม่งั้นเริ่มที่ง่าย · หมวดคำ [] = ทุกหมวด (เหมือนเดิม)
   const [difficulty, setDifficulty] = useState(boot?.difficulty ?? "easy");
+  const [categories] = useState(boot?.categories ?? []);
   const [round, setRound] = useState(null); // { level, word, time, lives, aiMode, drawNext }
   const [watch, setWatch] = useState(null); // ช่วง 2: { level, time, lives, category } (ไม่มีคำตอบ)
   const [wrongAnswers, setWrongAnswers] = useState([]); // คำที่เราทายผิดในช่วง 2
@@ -300,7 +301,7 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
     setLives(3);
     setFinal(null);
     setPhase("starting");
-    socket.emit("ai_start", { name: initialName, difficulty: boot.difficulty, avatar, nameOwnerKey: nameOwnerKey() });
+    socket.emit("ai_start", { name: initialName, difficulty: boot.difficulty, categories: boot.categories ?? [], avatar, nameOwnerKey: nameOwnerKey() });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -387,7 +388,7 @@ export default function SoloAI({ initialName = "", avatar = 0, boot = null, onNa
     setLives(3);
     setFinal(null);
     setPhase("starting");
-    socket.emit("ai_start", { name, difficulty, avatar, nameOwnerKey: nameOwnerKey() });
+    socket.emit("ai_start", { name, difficulty, categories, avatar, nameOwnerKey: nameOwnerKey() });
   }
 
   // ช่วง 2: ส่งคำที่พิมพ์ให้ server ตัดสิน (ฝั่งนี้ไม่รู้คำตอบเลย)

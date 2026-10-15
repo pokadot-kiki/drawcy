@@ -6,6 +6,8 @@ import { AvatarArt, Icon } from "../components/Icons";
 import { useEnterRoom } from "../hooks/useEnterRoom";
 import OptionRow from "../components/OptionRow";
 import AvatarPicker from "../components/AvatarPicker";
+import CategoryChips from "../components/CategoryChips";
+import { useWordCategories } from "../hooks/useWordCategories";
 import { DIFFICULTY_CHOICES, VISIBILITY_CHOICES, maxPlayersChoices, TEAM_COUNT_CHOICES, minPlayersForTeams } from "../roomOptions";
 
 // หน้า SET UP (กดสร้างห้องแล้วมาหน้านี้): ซ้าย ตั้งค่ารอบ/เวลา · ขวา การ์ดโหมดใหญ่สองใบ · ล่าง ปุ่มสร้างห้อง
@@ -44,6 +46,8 @@ export default function SetUp({ connected, profile, onProfile, onBack, onEntered
   const [visibility, setVisibility] = useState("private");
   const [maxPlayers, setMaxPlayers] = useState(8); // กี่คนต่อห้อง (เฉพาะแข่งเดี่ยว)
   const [teams, setTeams] = useState(2); // จำนวนทีมในโหมดทีม 2/3/4
+  const [categories, setCategories] = useState([]); // หมวดคำของ Solo ([] = ทุกหมวด)
+  const soloCats = useWordCategories("solo"); // รายการหมวด + จำนวนคำของคลัง Solo (ai-words.json)
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   // Challenge เลือกเปิด/ปิดทีละใบในห้องรอ (การ์ด 4 ใบ) ไม่ตั้งที่นี่แล้ว — ห้องเริ่มด้วยชุดเริ่มต้นของ server
   const { busy, enter } = useEnterRoom({ connected, onEntered, onError });
@@ -53,8 +57,8 @@ export default function SetUp({ connected, profile, onProfile, onBack, onEntered
 
   function submit() {
     if (isAI) {
-      // โหมดแข่งกับ AI: ไม่สร้างห้อง เข้าเกม Solo ทันทีด้วยความยากที่เลือก
-      onStartSolo(difficulty);
+      // โหมดแข่งกับ AI: ไม่สร้างห้อง เข้าเกม Solo ทันทีด้วยความยาก/หมวดที่เลือก
+      onStartSolo({ difficulty, categories });
       return;
     }
     const who = name.trim() || randomName(); // กันกรณีชื่อว่าง
@@ -136,6 +140,22 @@ export default function SetUp({ connected, profile, onProfile, onBack, onEntered
               <Icon name="star" size={22} /> ความยากของคำ
             </h3>
             <OptionRow label="ระดับความยากของคำ" choices={DIFFICULTY_CHOICES} value={difficulty} onChange={setDifficulty} />
+            {/* หมวดคำของ Solo: เลือกได้หลายหมวด (ไม่เลือกเลย = ทุกหมวด) — อยู่ในกล่องเดียวกับความยากเพื่อไม่ให้หน้าสูงขึ้น
+                โหมดเล่นกับเพื่อนเลือกหมวดได้ในห้องรอ (ตอนสร้างห้องยังไม่มีห้องให้เก็บค่า) */}
+            {isAI && (
+              <div className="setup__cats">
+                <span className="setup__cats-label">หมวดคำ</span>
+                <CategoryChips
+                  variant="row"
+                  list={soloCats.categories}
+                  value={categories}
+                  difficulty={difficulty}
+                  mode="solo"
+                  perTurn={soloCats.perTurn}
+                  onChange={setCategories}
+                />
+              </div>
+            )}
           </div>
           {/* อธิบายวิธีเล่น Solo ให้ตรงกับที่ server ทำจริง (ตัวเลขจาก server/ai.js levelConfig + SOLO_LIVES) */}
           {isAI && <SoloRules />}
