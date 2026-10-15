@@ -49,7 +49,11 @@
     { "word": "ใบไม้", "category": "ธรรมชาติ", "aliases": ["leaf"] },
     { "word": "ก้อนเมฆ", "category": "ธรรมชาติ", "aliases": ["cloud", "เมฆ"] },
     { "word": "ฝน", "category": "ธรรมชาติ", "aliases": ["rain", "ฝนตก"] },
-    { "word": "ดาว", "category": "ธรรมชาติ", "aliases": ["star", "ดวงดาว"] }
+    { "word": "ดาว", "category": "ธรรมชาติ", "aliases": ["star", "ดวงดาว"] },
+    { "word": "ปากกา", "category": "มหาวิทยาลัย", "aliases": ["pen", "ปากกาลูกลื่น"] },
+    { "word": "ยางลบ", "category": "มหาวิทยาลัย", "aliases": ["eraser", "rubber"] },
+    { "word": "ไม้บรรทัด", "category": "มหาวิทยาลัย", "aliases": ["ruler"] },
+    { "word": "ตลาด", "category": "สถานที่", "aliases": ["market", "ตลาดนัด"] }
   ],
   "medium": [
     { "word": "ยีราฟ", "category": "สัตว์", "aliases": ["giraffe"] },
@@ -101,7 +105,10 @@
     { "word": "เชฟ", "category": "อาชีพ", "aliases": ["chef", "พ่อครัว", "แม่ครัว", "กุ๊ก"] },
     { "word": "ฟุตบอล", "category": "กีฬา", "aliases": ["football", "soccer", "บอล"] },
     { "word": "บาสเกตบอล", "category": "กีฬา", "aliases": ["basketball", "บาส", "บาสเก็ตบอล"] },
-    { "word": "ว่ายน้ำ", "category": "กีฬา", "aliases": ["swimming", "swim"] }
+    { "word": "ว่ายน้ำ", "category": "กีฬา", "aliases": ["swimming", "swim"] },
+    { "word": "แล็ปท็อป", "category": "มหาวิทยาลัย", "aliases": ["laptop", "notebook"] },
+    { "word": "กระติกน้ำ", "category": "มหาวิทยาลัย", "aliases": ["water bottle", "ขวดน้ำ", "กระติก"] },
+    { "word": "กล่องดินสอ", "category": "มหาวิทยาลัย", "aliases": ["pencil case", "กระเป๋าดินสอ"] }
   ],
   "hard": [
     { "word": "รถไฟเหาะ", "category": "สถานที่", "aliases": ["roller coaster", "rollercoaster"] },
@@ -133,6 +140,11 @@
     { "word": "เครื่องร่อน", "category": "ยานพาหนะ", "aliases": ["glider"] },
     { "word": "จิตรกร", "category": "อาชีพ", "aliases": ["painter", "artist"] },
     { "word": "ยิมนาสติก", "category": "กีฬา", "aliases": ["gymnastics", "gymnast"] },
-    { "word": "ยิงธนู", "category": "กีฬา", "aliases": ["archery", "ธนู"] }
+    { "word": "ยิงธนู", "category": "กีฬา", "aliases": ["archery", "ธนู"] },
+    { "word": "ไดโนเสาร์", "category": "มหาวิทยาลัย", "aliases": ["dinosaur", "dino", "ไดโน"] },
+    { "word": "ครุย", "category": "มหาวิทยาลัย", "aliases": ["academic gown", "เสื้อครุย", "ชุดครุย"] },
+    { "word": "หอพัก", "category": "มหาวิทยาลัย", "aliases": ["dormitory", "dorm", "หอพักนักศึกษา"] },
+    { "word": "ไมโครโฟน", "category": "สิ่งของ", "aliases": ["microphone", "mic", "ไมค์"] },
+    { "word": "มวยไทย", "category": "กีฬา", "aliases": ["muay thai", "มวย"] }
   ]
 }
